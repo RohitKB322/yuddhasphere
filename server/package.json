@@ -1,0 +1,21 @@
+{
+  "name": "@yuddhasphere/server",
+  "version": "0.1.0",
+  "description": "Authoritative real-time WebSocket server for YuddhaSphere",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "node --watch dist/server.js",
+    "test": "node dist/test_server_scalability.js"
+  },
+  "dependencies": {
+    "@yuddhasphere/shared-rules": "file:../shared-rules",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.4.0"
+  }
+}

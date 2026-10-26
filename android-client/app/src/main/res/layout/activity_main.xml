@@ -1,0 +1,2139 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_tactical_dark">
+
+    <!-- Edge-to-edge Map WebView (Hardware-accelerated, Never Obscured) -->
+    <WebView
+        android:id="@+id/mapWebView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- TOP HUD (Translucent Glass Bar, ~65% opacity, safe-area aware) -->
+    <LinearLayout
+        android:id="@+id/topHudContainer"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginTop="36dp"
+        android:background="@drawable/bg_glass_hud"
+        android:elevation="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Money / Wealth Pill -->
+        <LinearLayout
+            android:id="@+id/btnWealthDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_pill_stat"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <ImageView
+                android:layout_width="15dp"
+                android:layout_height="15dp"
+                android:src="@drawable/ic_currency"
+                android:contentDescription="Credits" />
+
+            <TextView
+                android:id="@+id/tvWealth"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:fontFamily="sans-serif-black"
+                android:text="2,500"
+                android:textColor="@color/accent_gold"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Income Rate Pill -->
+        <LinearLayout
+            android:id="@+id/btnIncomeDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_pill_stat"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@drawable/ic_income"
+                android:contentDescription="Income rate" />
+
+            <TextView
+                android:id="@+id/tvIncomeRate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="+100/hr"
+                android:textColor="@color/accent_green"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <!-- Server Sync State Badge -->
+        <TextView
+            android:id="@+id/tvServerSyncBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_pill_stat"
+            android:fontFamily="sans-serif-bold"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="● AUTONOMOUS"
+            android:textColor="@color/accent_orange"
+            android:textSize="9sp" />
+
+        <!-- Player HP Indicator -->
+        <LinearLayout
+            android:id="@+id/btnHpDetails"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_pill_stat"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@drawable/ic_hp"
+                android:contentDescription="HP" />
+
+            <TextView
+                android:id="@+id/tvHp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="1000"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- LOCATE ME BUTTON (In Top HUD near HP) -->
+        <ImageButton
+            android:id="@+id/btnRecenterGps"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginEnd="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_gps_recenter"
+            android:contentDescription="Locate Me on GPS" />
+
+        <!-- Alert Bell Icon -->
+        <ImageButton
+            android:id="@+id/btnAlerts"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_alert"
+            android:contentDescription="Alerts" />
+    </LinearLayout>
+
+    <!-- SORTIE TARGETING BANNER -->
+    <LinearLayout
+        android:id="@+id/sortieTargetingBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="14dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tvSortieHint"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-bold"
+            android:text="✈ Tap map target to launch Air Sortie"
+            android:textColor="@color/accent_orange"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnCancelSortie"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_secondary_button"
+            android:text="Cancel"
+            android:textColor="@color/text_secondary"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- PLACEMENT CONTROL BAR -->
+    <LinearLayout
+        android:id="@+id/placementControlBar"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="14dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tvPlacementHint"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="sans-serif-medium"
+            android:text="Drag or tap map to aim"
+            android:textColor="@color/white"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btnPlaceAtGps"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_secondary_button"
+            android:text="🎯 At GPS"
+            android:textColor="@color/primary_neon"
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btnCancelPlacement"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_secondary_button"
+            android:text="✕"
+            android:textColor="@color/text_secondary"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnConfirmPlacement"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_accent_button"
+            android:text="✓ Build"
+            android:textColor="@color/bg_tactical_dark"
+            android:fontFamily="sans-serif-black"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- IN-LAYOUT FLOATING CARDS (Ensures map is NEVER blacked out) -->
+
+    <!-- 1. STRUCTURE INSPECTOR CARD (Enlarged, Clear & High-Contrast) -->
+    <LinearLayout
+        android:id="@+id/cardStructureInspector"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="18dp"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/ivInspectorIcon"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_secondary_button"
+                android:padding="8dp"
+                android:src="@drawable/ic_village" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvInspectorName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="Structure Name"
+                    android:textColor="@color/white"
+                    android:textSize="17sp" />
+
+                <TextView
+                    android:id="@+id/tvInspectorLevel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Level 1 • Structure"
+                    android:textColor="@color/primary_neon"
+                    android:textSize="12.5sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvInspectorStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_pill_stat"
+                android:fontFamily="sans-serif-black"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:text="ONLINE"
+                android:textColor="@color/accent_green"
+                android:textSize="11sp" />
+
+            <ImageButton
+                android:id="@+id/btnCloseInspector"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="8dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <!-- HP Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Structure Health (HP)"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvInspectorHp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="100 / 100"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/pbInspectorHp"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progress="100"
+                android:progressTint="@color/accent_green" />
+        </LinearLayout>
+
+        <!-- Stats Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvInspectorRadius"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_stat"
+                android:gravity="center"
+                android:padding="8dp"
+                android:text="Radius: 150m"
+                android:textColor="@color/primary_neon"
+                android:fontFamily="sans-serif-bold"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/tvInspectorIncome"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_stat"
+                android:gravity="center"
+                android:padding="8dp"
+                android:text="Income: +$50/hr"
+                android:textColor="@color/accent_green"
+                android:fontFamily="sans-serif-bold"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- INTERACTIVE AIRBASE HANGAR BAYS CONTAINER -->
+        <LinearLayout
+            android:id="@+id/layoutHangarSlots"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvHangarHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="✈ AIRBASE HANGAR BAYS (SLOTS)"
+                android:textColor="@color/primary_neon"
+                android:textSize="12sp" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/containerHangarSlots"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+        </LinearLayout>
+
+        <!-- INTERACTIVE SAM MISSILE SILOS CONTAINER -->
+        <LinearLayout
+            android:id="@+id/layoutSamSlots"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tvSamHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="🚀 SAM INTERCEPTOR SILOS (SLOTS)"
+                android:textColor="@color/accent_orange"
+                android:textSize="12sp" />
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/containerSamSlots"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+            </HorizontalScrollView>
+        </LinearLayout>
+
+        <!-- Upgrade & Repair Row -->
+        <LinearLayout
+            android:id="@+id/rowInspectorUpgrade"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnInspectorUpgrade"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-black"
+                android:text="UPGRADE ($800)"
+                android:textColor="@color/primary_neon"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnInspectorRepair"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-bold"
+                android:text="Repair ($50)"
+                android:textColor="@color/accent_green"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnInspectorSell"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_danger_button"
+                android:fontFamily="sans-serif-bold"
+                android:text="Sell"
+                android:textColor="@color/accent_red"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ========================================================================= -->
+    <!-- 🔴 OVERLAY: 24/7 TACTICAL WAR WIRE & BREAKING NEWS BROADCAST (FULL SCREEN) -->
+    <!-- 2. IN-FLIGHT JET TACTICAL CONTROL CARD -->
+    <LinearLayout
+        android:id="@+id/cardJetSortieControl"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="20dp"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Jet Title & Order -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/ic_jet_f16" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvJetControlTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="F-15 Strike Eagle (Lead Sortie)"
+                    android:textColor="@color/white"
+                    android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/tvJetControlStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="AIR STRIKE MISSION • EN ROUTE"
+                    android:textColor="@color/accent_orange"
+                    android:textSize="11.5sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnCloseJetControl"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <!-- Live Fuel Gauge -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Fuel Level (Bingo Reserve: 20%)"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11.5sp" />
+
+                <TextView
+                    android:id="@+id/tvJetFuelPercent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="85%"
+                    android:textColor="@color/accent_green"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/pbJetFuel"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="6dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progress="85"
+                android:progressTint="@color/accent_green" />
+        </LinearLayout>
+
+        <!-- Weapons & Speed Info -->
+        <TextView
+            android:id="@+id/tvJetWeaponsLoadout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_pill_stat"
+            android:padding="8dp"
+            android:text="Armament: 4x GBU-12 Guided Bombs • 2x AIM-120"
+            android:textColor="@color/white"
+            android:fontFamily="sans-serif-medium"
+            android:textSize="12sp" />
+
+        <!-- Speed Selector (Subsonic vs Supersonic) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSpeedSubsonic"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_accent_button"
+                android:fontFamily="sans-serif-bold"
+                android:text="SUBSONIC (Cruise)"
+                android:textColor="@color/bg_tactical_dark"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnSpeedSupersonic"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-bold"
+                android:text="SUPERSONIC (Dash)"
+                android:textColor="@color/accent_orange"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Radar Vision Sector Selection (30, 60, 90 degrees) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-bold"
+                android:text="Radar Arc:"
+                android:textColor="@color/text_secondary"
+                android:textSize="11.5sp" />
+
+            <Button
+                android:id="@+id/btnRadarArc30"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="30° Track"
+                android:textColor="@color/white"
+                android:textSize="10.5sp" />
+
+            <Button
+                android:id="@+id/btnRadarArc60"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_accent_button"
+                android:text="60° Sector"
+                android:textColor="@color/bg_tactical_dark"
+                android:fontFamily="sans-serif-black"
+                android:textSize="10.5sp" />
+
+            <Button
+                android:id="@+id/btnRadarArc90"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="90° Wide"
+                android:textColor="@color/white"
+                android:textSize="10.5sp" />
+        </LinearLayout>
+
+        <!-- Rules of Engagement (Tactics) -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-bold"
+                android:text="Tactics:"
+                android:textColor="@color/text_secondary"
+                android:textSize="11.5sp" />
+
+            <Button
+                android:id="@+id/btnRoeAggressive"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="🎯 Aggressive"
+                android:textColor="@color/accent_orange"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btnRoeFireAtWill"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_accent_button"
+                android:text="⚔ Fire at Will"
+                android:textColor="@color/bg_tactical_dark"
+                android:fontFamily="sans-serif-black"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btnRoePeaceful"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="🕊 Hold Fire"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Fox-2 Missile Fire Button -->
+        <Button
+            android:id="@+id/btnLaunchFoxTwo"
+            android:layout_width="match_parent"
+            android:layout_height="38dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_accent_button"
+            android:fontFamily="sans-serif-black"
+            android:text="🚀 FOX-2 MISSILE STRIKE (ANIMATED)"
+            android:textColor="@color/bg_tactical_dark"
+            android:textSize="12sp" />
+
+        <!-- In-flight Action Controls -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnAbortRtb"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_danger_button"
+                android:fontFamily="sans-serif-bold"
+                android:text="ABORT &amp; RTB"
+                android:textColor="@color/accent_red"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnRetargetSortie"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="4dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="Re-Target"
+                android:textColor="@color/primary_neon"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnSetPatrol"
+                android:layout_width="0dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="Patrol Orbit"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ========================================================================= -->
+    <!-- 🔴 OVERLAY: 24/7 TACTICAL WAR WIRE & BREAKING NEWS BROADCAST (FULL SCREEN) -->
+    <!-- 3. COMMANDER PROFILE CARD (Transparent bottom sheet when tapping Avatar on map) -->
+    <LinearLayout
+        android:id="@+id/cardCommanderProfile"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="20dp"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_secondary_button"
+                android:padding="8dp"
+                android:src="@drawable/ic_avatar_player" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvProfileCallsign"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="Commander Garuda"
+                    android:textColor="@color/white"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/tvProfileRank"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Captain (Grade II) • [SOL] Solar Vanguard"
+                    android:textColor="@color/primary_neon"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnCloseCommanderProfile"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <!-- Stats Grid: Net Worth & XP -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_stat"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ESTIMATED NET WORTH"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/tvProfileNetWorth"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-black"
+                    android:text="$18,500"
+                    android:textColor="@color/accent_green"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_stat"
+                android:orientation="vertical"
+                android:padding="10dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MILITARY COMBAT XP"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10sp" />
+
+                <TextView
+                    android:id="@+id/tvProfileXp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:fontFamily="sans-serif-black"
+                    android:text="750 / 1000 XP"
+                    android:textColor="@color/primary_neon"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- XP Progress Bar -->
+        <ProgressBar
+            android:id="@+id/pbProfileXp"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:layout_marginTop="8dp"
+            android:max="1000"
+            android:progress="750"
+            android:progressTint="@color/primary_neon" />
+
+        <!-- Edit Profile & Settings Button -->
+        <Button
+            android:id="@+id/btnEditCommanderProfile"
+            android:layout_width="match_parent"
+            android:layout_height="40dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_secondary_button"
+            android:fontFamily="sans-serif-bold"
+            android:text="✎ EDIT CALLSIGN &amp; ALLIANCE"
+            android:textColor="@color/white"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- 3. COMMANDER PROFILE & v0.5 MULTIPLAYER SERVER SETTINGS -->
+    <LinearLayout
+        android:id="@+id/cardCommanderSetup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="26dp"
+        android:orientation="vertical"
+        android:padding="18dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-black"
+                android:text="COMMANDER &amp; SERVER SETTINGS"
+                android:textColor="@color/white"
+                android:textSize="15sp" />
+
+            <ImageButton
+                android:id="@+id/btnCloseCommanderSetup"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Configure identification and real-time multiplayer server connection."
+            android:textColor="@color/text_secondary"
+            android:textSize="10.5sp" />
+
+        <!-- Commander Info -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:fontFamily="sans-serif-bold"
+            android:text="COMMANDER IDENTIFICATION"
+            android:textColor="@color/primary_neon"
+            android:textSize="10.5sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/etCommanderCallsign"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1.6"
+                android:background="@drawable/bg_pill_stat"
+                android:hint="Callsign (Garuda-1)"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textColor="@color/white"
+                android:textColorHint="@color/text_muted"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/etCommanderTag"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_stat"
+                android:hint="Tag (Optional)"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textColor="@color/white"
+                android:textColorHint="@color/text_muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- v0.5 Multiplayer Server Connection Settings -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="sans-serif-bold"
+            android:text="v0.5 MULTIPLAYER SERVER (WEBSOCKET)"
+            android:textColor="@color/primary_neon"
+            android:textSize="10.5sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/etServerHost"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="2"
+                android:background="@drawable/bg_pill_stat"
+                android:hint="Host / IP (e.g. 10.0.2.2)"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textColor="@color/white"
+                android:textColorHint="@color/text_muted"
+                android:textSize="12sp" />
+
+            <EditText
+                android:id="@+id/etServerPort"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_pill_stat"
+                android:hint="Port (8080)"
+                android:inputType="number"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:textColor="@color/white"
+                android:textColorHint="@color/text_muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Presets Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnPresetEmulator"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="Emulator (10.0.2.2)"
+                android:textColor="@color/text_secondary"
+                android:textSize="9.5sp" />
+
+            <Button
+                android:id="@+id/btnPresetLocalhost"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:text="PC (127.0.0.1)"
+                android:textColor="@color/text_secondary"
+                android:textSize="9.5sp" />
+        </LinearLayout>
+
+        <!-- Server Status & Ping -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvServerStatusBadge"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-bold"
+                android:text="Status: AUTONOMOUS"
+                android:textColor="@color/accent_orange"
+                android:textSize="10.5sp" />
+
+            <Button
+                android:id="@+id/btnTestServerConnection"
+                android:layout_width="wrap_content"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-bold"
+                android:text="TEST PING"
+                android:textColor="@color/primary_neon"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnSaveCommanderProfile"
+            android:layout_width="match_parent"
+            android:layout_height="42dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_accent_button"
+            android:fontFamily="sans-serif-black"
+            android:text="SAVE SETTINGS &amp; RECONNECT"
+            android:textColor="@color/bg_tactical_dark"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- BOTTOM NAV BAR (Translucent Glass Bar, ~65% opacity, safe-area aware) -->
+    <LinearLayout
+        android:id="@+id/bottomNavBar"
+        android:layout_width="0dp"
+        android:layout_height="64dp"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="24dp"
+        android:background="@drawable/bg_glass_bar"
+        android:elevation="12dp"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:weightSum="5"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- 1. BUILD -->
+        <LinearLayout
+            android:id="@+id/navBuild"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_build"
+                android:contentDescription="Build" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-bold"
+                android:text="Build"
+                android:textColor="@color/primary_neon"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 2. MILITARY -->
+        <LinearLayout
+            android:id="@+id/navMilitary"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_military"
+                android:contentDescription="Military" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="Military"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 3. ALLIANCE -->
+        <LinearLayout
+            android:id="@+id/navAlliance"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_alliance"
+                android:contentDescription="Alliance" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="Alliance"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 4. REPORTS -->
+        <LinearLayout
+            android:id="@+id/navReports"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_reports"
+                android:contentDescription="Reports" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="Reports"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- 5. MENU -->
+        <LinearLayout
+            android:id="@+id/navMenu"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Menu" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="Menu"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ========================================================================= -->
+    <!-- 🔴 OVERLAY: 24/7 TACTICAL WAR WIRE & BREAKING NEWS BROADCAST (FULL SCREEN) -->
+    <!-- ========================================================================= -->
+    <LinearLayout
+        android:id="@+id/overlayReportsScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F0070B14"
+        android:orientation="vertical"
+        android:elevation="35dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Top News Broadcast Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:background="#33FF3B30"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_danger_button"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:fontFamily="sans-serif-black"
+                android:text="🔴 LIVE"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="WAR WIRE • 24/7 DEFENSE NETWORK"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Real-time Satellite Intel &amp; Combat Dispatches"
+                    android:textColor="#FF9F0A"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnCloseReports"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <!-- Breaking News Live Marquee / Ticker -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="32dp"
+            android:background="#1affffff"
+            android:gravity="center_vertical"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="⚡ BREAKING:"
+                android:textColor="#FFD60A"
+                android:textSize="10.5sp" />
+
+            <TextView
+                android:id="@+id/tvNewsTicker"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:singleLine="true"
+                android:ellipsize="marquee"
+                android:marqueeRepeatLimit="marquee_forever"
+                android:fontFamily="sans-serif-medium"
+                android:text="PATRIOT-ALPHA BATTERY NEUTRALIZED BOGEY • RADAR CONTACTS CONFIRMED IN SECTOR 4 • TAX DUTIES HARVESTED"
+                android:textColor="@color/white"
+                android:textSize="10.5sp" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <!-- Featured Breaking News Banner Card -->
+                <LinearLayout
+                    android:id="@+id/cardFeaturedNews"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_glass_card"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvFeaturedUrgencyTag"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_danger_button"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="8dp"
+                            android:paddingTop="2dp"
+                            android:paddingBottom="2dp"
+                            android:fontFamily="sans-serif-black"
+                            android:text="🚨 WAR BULLETIN"
+                            android:textColor="@color/white"
+                            android:textSize="10sp" />
+
+                        <TextView
+                            android:id="@+id/tvFeaturedTime"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:fontFamily="sans-serif-bold"
+                            android:text="JUST NOW • 19.0760° N, 72.8777° E"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvFeaturedHeadline"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:fontFamily="sans-serif-black"
+                        android:text="MASSIVE AIR INCURSION INTERCEPTED OVER SECTOR 4"
+                        android:textColor="@color/white"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/tvFeaturedBody"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:lineSpacingExtra="3dp"
+                        android:text="PATRIOT-Alpha Air Defense Battery tracked and engaged supersonic hostile strike formation. 1x Bogey neutralized with zero collateral damage recorded in perimeter."
+                        android:textColor="#D0D5DD"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- News Category Filter Tabs -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnNewsFilterAll"
+                            android:layout_width="wrap_content"
+                            android:layout_height="34dp"
+                            android:background="@drawable/bg_accent_button"
+                            android:fontFamily="sans-serif-black"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="12dp"
+                            android:text="🔴 ALL WIRE"
+                            android:textColor="@color/bg_tactical_dark"
+                            android:textSize="10.5sp" />
+
+                        <Button
+                            android:id="@+id/btnNewsFilterWar"
+                            android:layout_width="wrap_content"
+                            android:layout_height="34dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_secondary_button"
+                            android:fontFamily="sans-serif-bold"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="12dp"
+                            android:text="⚔ WAR DISPATCHES"
+                            android:textColor="@color/white"
+                            android:textSize="10.5sp" />
+
+                        <Button
+                            android:id="@+id/btnNewsFilterRadar"
+                            android:layout_width="wrap_content"
+                            android:layout_height="34dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_secondary_button"
+                            android:fontFamily="sans-serif-bold"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="12dp"
+                            android:text="📡 RADAR FLASH"
+                            android:textColor="@color/white"
+                            android:textSize="10.5sp" />
+
+                        <Button
+                            android:id="@+id/btnNewsFilterEconomy"
+                            android:layout_width="wrap_content"
+                            android:layout_height="34dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/bg_secondary_button"
+                            android:fontFamily="sans-serif-bold"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="12dp"
+                            android:text="💰 TREASURY WIRE"
+                            android:textColor="@color/white"
+                            android:textSize="10.5sp" />
+                    </LinearLayout>
+                </HorizontalScrollView>
+
+                <!-- Dynamic News Feed List Container -->
+                <LinearLayout
+                    android:id="@+id/containerNewsFeed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="80dp" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <!-- ========================================================================= -->
+    <!-- 🌐 OVERLAY: FULL-PAGE ALLIANCE COMMAND & DIPLOMACY NEXUS -->
+    <!-- ========================================================================= -->
+    <LinearLayout
+        android:id="@+id/overlayAllianceScreen"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F0070B14"
+        android:orientation="vertical"
+        android:elevation="35dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Top Alliance Header -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:background="#2200E5FF"
+            android:gravity="center_vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:src="@drawable/ic_alliance" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="ALLIANCE COMMAND NEXUS"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Cabinet Hierarchy • Treaties &amp; Global Registry"
+                    android:textColor="@color/primary_neon"
+                    android:textSize="10sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnCloseAlliance"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:scrollbars="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <!-- SECTION 1: YOUR ALLIANCE STATUS (TOP CARD) -->
+                <LinearLayout
+                    android:id="@+id/cardMyAllianceStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_glass_card"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <!-- When No Alliance: Empty State View -->
+                    <LinearLayout
+                        android:id="@+id/viewNoAllianceState"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="10dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-black"
+                            android:text="⚡ INDEPENDENT COMMANDER"
+                            android:textColor="@color/accent_orange"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:gravity="center"
+                            android:text="You currently have no alliance affiliation.\nEstablish a sovereign faction or enlist into a registered empire below."
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11.5sp" />
+
+                        <Button
+                            android:id="@+id/btnOpenCreateAlliance"
+                            android:layout_width="match_parent"
+                            android:layout_height="42dp"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_accent_button"
+                            android:fontFamily="sans-serif-black"
+                            android:text="➕ ESTABLISH SOVEREIGN ALLIANCE"
+                            android:textColor="@color/bg_tactical_dark"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+
+                    <!-- When In Alliance: Faction Dashboard -->
+                    <LinearLayout
+                        android:id="@+id/viewActiveAllianceDashboard"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:visibility="gone">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:id="@+id/tvMyAllianceName"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-black"
+                                    android:text="Solar Vanguard [SOL]"
+                                    android:textColor="@color/white"
+                                    android:textSize="17sp" />
+
+                                <TextView
+                                    android:id="@+id/tvMyAllianceFounded"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Founded: 26 Oct 2026 • Leader: Garuda-1"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+
+                            <TextView
+                                android:id="@+id/tvMyRoleBadge"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:background="@drawable/bg_accent_button"
+                                android:paddingStart="10dp"
+                                android:paddingEnd="10dp"
+                                android:paddingTop="4dp"
+                                android:paddingBottom="4dp"
+                                android:fontFamily="sans-serif-black"
+                                android:text="👑 SUPREME COMMANDER"
+                                android:textColor="@color/bg_tactical_dark"
+                                android:textSize="10.5sp" />
+                        </LinearLayout>
+
+                        <!-- Key Metrics Row -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:orientation="horizontal">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_pill_stat"
+                                android:orientation="vertical"
+                                android:padding="8dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ALLIANCE TREASURY"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="9sp" />
+
+                                <TextView
+                                    android:id="@+id/tvAllianceTreasury"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-black"
+                                    android:text="$5,000"
+                                    android:textColor="@color/accent_green"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_pill_stat"
+                                android:orientation="vertical"
+                                android:padding="8dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="TAX RATE"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="9sp" />
+
+                                <TextView
+                                    android:id="@+id/tvAllianceTaxRate"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-black"
+                                    android:text="10% Duties"
+                                    android:textColor="@color/primary_neon"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="6dp"
+                                android:layout_weight="1"
+                                android:background="@drawable/bg_pill_stat"
+                                android:orientation="vertical"
+                                android:padding="8dp">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="ROSTER SIZE"
+                                    android:textColor="@color/text_secondary"
+                                    android:textSize="9sp" />
+
+                                <TextView
+                                    android:id="@+id/tvAllianceRosterCount"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="sans-serif-black"
+                                    android:text="1 Member"
+                                    android:textColor="@color/white"
+                                    android:textSize="13sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- ROLE-BASED ACTIONS: TAX & PROMOTIONS & TREATIES -->
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:fontFamily="sans-serif-black"
+                            android:text="CABINET ACTIONS &amp; AUTHORITY"
+                            android:textColor="@color/primary_neon"
+                            android:textSize="11sp" />
+
+                        <!-- Tax Rate Control (Enabled for Supreme Commander & Financial Minister) -->
+                        <LinearLayout
+                            android:id="@+id/layoutTaxControl"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:background="@drawable/bg_pill_stat"
+                            android:orientation="vertical"
+                            android:padding="10dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="💼 FINANCIAL MINISTRY: SET CONTRIBUTION TAX"
+                                android:textColor="@color/white"
+                                android:fontFamily="sans-serif-bold"
+                                android:textSize="10.5sp" />
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:orientation="horizontal">
+
+                                <Button
+                                    android:id="@+id/btnTax0"
+                                    android:layout_width="0dp"
+                                    android:layout_height="32dp"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_secondary_button"
+                                    android:text="0%"
+                                    android:textColor="@color/white"
+                                    android:textSize="10sp" />
+
+                                <Button
+                                    android:id="@+id/btnTax5"
+                                    android:layout_width="0dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginStart="4dp"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_secondary_button"
+                                    android:text="5%"
+                                    android:textColor="@color/white"
+                                    android:textSize="10sp" />
+
+                                <Button
+                                    android:id="@+id/btnTax10"
+                                    android:layout_width="0dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginStart="4dp"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_accent_button"
+                                    android:fontFamily="sans-serif-black"
+                                    android:text="10%"
+                                    android:textColor="@color/bg_tactical_dark"
+                                    android:textSize="10sp" />
+
+                                <Button
+                                    android:id="@+id/btnTax15"
+                                    android:layout_width="0dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginStart="4dp"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_secondary_button"
+                                    android:text="15%"
+                                    android:textColor="@color/white"
+                                    android:textSize="10sp" />
+
+                                <Button
+                                    android:id="@+id/btnTax20"
+                                    android:layout_width="0dp"
+                                    android:layout_height="32dp"
+                                    android:layout_marginStart="4dp"
+                                    android:layout_weight="1"
+                                    android:background="@drawable/bg_secondary_button"
+                                    android:text="20%"
+                                    android:textColor="@color/white"
+                                    android:textSize="10sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+
+                        <!-- Alliance Members Roster & Promotion View -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-bold"
+                                android:text="MEMBERS &amp; POST PROMOTIONS"
+                                android:textColor="@color/text_secondary"
+                                android:textSize="10.5sp" />
+
+                            <LinearLayout
+                                android:id="@+id/containerMyAllianceMembers"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:orientation="vertical" />
+                        </LinearLayout>
+
+                        <!-- Leave Alliance Button -->
+                        <Button
+                            android:id="@+id/btnLeaveAlliance"
+                            android:layout_width="match_parent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="12dp"
+                            android:background="@drawable/bg_danger_button"
+                            android:fontFamily="sans-serif-bold"
+                            android:text="DEPART / DISBAND ALLIANCE"
+                            android:textColor="@color/accent_red"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- SECTION 2: CREATE ALLIANCE INLINE FORM (HIDDEN BY DEFAULT) -->
+                <LinearLayout
+                    android:id="@+id/layoutCreateAllianceForm"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:background="@drawable/bg_glass_card"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-black"
+                        android:text="COMMISSION SOVEREIGN ALLIANCE"
+                        android:textColor="@color/primary_neon"
+                        android:textSize="14sp" />
+
+                    <EditText
+                        android:id="@+id/etNewAllianceName"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="10dp"
+                        android:background="@drawable/bg_pill_stat"
+                        android:hint="Alliance Name (e.g. Solar Vanguard)"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/white"
+                        android:textColorHint="@color/text_muted"
+                        android:textSize="12.5sp" />
+
+                    <EditText
+                        android:id="@+id/etNewAllianceTag"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/bg_pill_stat"
+                        android:hint="Alliance Tag (e.g. SOL)"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/white"
+                        android:textColorHint="@color/text_muted"
+                        android:textSize="12.5sp" />
+
+                    <EditText
+                        android:id="@+id/etNewAllianceMotto"
+                        android:layout_width="match_parent"
+                        android:layout_height="42dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/bg_pill_stat"
+                        android:hint="Motto (e.g. Strike with honor)"
+                        android:paddingStart="10dp"
+                        android:paddingEnd="10dp"
+                        android:textColor="@color/white"
+                        android:textColorHint="@color/text_muted"
+                        android:textSize="12.5sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/btnCancelCreateAlliance"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_secondary_button"
+                            android:text="Cancel"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="11sp" />
+
+                        <Button
+                            android:id="@+id/btnConfirmCreateAlliance"
+                            android:layout_width="0dp"
+                            android:layout_height="40dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:background="@drawable/bg_accent_button"
+                            android:fontFamily="sans-serif-black"
+                            android:text="AUTHORIZE CHARTER"
+                            android:textColor="@color/bg_tactical_dark"
+                            android:textSize="11.5sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- SECTION 3: GLOBAL FACTION REGISTRY (OTHER ALLIANCES) -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:fontFamily="sans-serif-black"
+                    android:text="GLOBAL ALLIANCE REGISTRY"
+                    android:textColor="@color/white"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Tap an alliance to view dossier, members, and enlist"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="10.5sp" />
+
+                <LinearLayout
+                    android:id="@+id/containerGlobalAlliances"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="vertical" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="80dp" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

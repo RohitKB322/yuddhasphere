@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_pill_stat"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <!-- Icon Container -->
+    <ImageView
+        android:id="@+id/ivBuildingIcon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_secondary_button"
+        android:padding="8dp"
+        android:src="@drawable/ic_village"
+        android:contentDescription="Building Icon" />
+
+    <!-- Details Column -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvBuildingName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-bold"
+            android:text="Village"
+            android:textColor="@color/white"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvBuildingStats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="150m Influence • +$50/hr"
+            android:textColor="@color/accent_green"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/tvBuildingDesc"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="sans-serif"
+            android:text="Claims land territory and houses population."
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp"
+            android:maxLines="2" />
+    </LinearLayout>
+
+    <!-- Deploy / Cost Button -->
+    <Button
+        android:id="@+id/btnDeployBuilding"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:background="@drawable/bg_accent_button"
+        android:fontFamily="sans-serif-black"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:text="$350"
+        android:textColor="@color/bg_tactical_dark"
+        android:textSize="11sp" />
+
+</LinearLayout>

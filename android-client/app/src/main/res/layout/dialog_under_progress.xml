@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_glass_card"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <!-- Status Badge -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_badge_progress"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🛠"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/tvProgressBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:fontFamily="sans-serif-bold"
+            android:text="DEVELOPMENT UNDER PROGRESS"
+            android:textColor="@color/accent_orange"
+            android:letterSpacing="0.08"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+    <!-- Feature Title -->
+    <TextView
+        android:id="@+id/tvProgressTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:fontFamily="sans-serif-black"
+        android:text="Global Alliances &amp; Coalitions"
+        android:textColor="@color/white"
+        android:textSize="18sp" />
+
+    <!-- Feature Description -->
+    <TextView
+        android:id="@+id/tvProgressDesc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fontFamily="sans-serif"
+        android:lineSpacingExtra="4dp"
+        android:text="Multiplayer alliance treaties, territory federation, and joint defense pacts are slated for Milestone 4 after authoritative server synchronization is connected."
+        android:textColor="@color/text_secondary"
+        android:textSize="13sp" />
+
+    <!-- Version Roadmap Target Pill -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_pill_stat"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎯"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvProgressMilestone"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="Target: Milestone 2 &amp; 3 (v0.2 Sync)"
+            android:textColor="@color/primary_neon"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- Dismiss Button -->
+    <Button
+        android:id="@+id/btnProgressDismiss"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_accent_button"
+        android:fontFamily="sans-serif-black"
+        android:text="Understood"
+        android:textColor="@color/bg_tactical_dark"
+        android:textSize="13sp" />
+
+</LinearLayout>

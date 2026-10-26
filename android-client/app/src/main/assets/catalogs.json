@@ -1,0 +1,122 @@
+{
+  "jets": [
+    {
+      "id": "jet_f16",
+      "name": "F-16 Falcon",
+      "role": "Multirole Fighter",
+      "speedMps": 220,
+      "rangeMeters": 15000,
+      "damage": 60,
+      "hp": 100,
+      "cost": 900,
+      "assetKey": "unit.jet_f16",
+      "description": "Fast multirole fighter capable of air defense and light strike missions."
+    },
+    {
+      "id": "jet_mirage2000",
+      "name": "Mirage 2000",
+      "role": "Interceptor / Strike",
+      "speedMps": 240,
+      "rangeMeters": 12000,
+      "damage": 55,
+      "hp": 90,
+      "cost": 850,
+      "assetKey": "unit.jet_mirage2000",
+      "description": "High-altitude delta-wing interceptor with rapid scramble capability."
+    },
+    {
+      "id": "jet_f15",
+      "name": "F-15 Eagle",
+      "role": "Air Superiority",
+      "speedMps": 250,
+      "rangeMeters": 25000,
+      "damage": 80,
+      "hp": 120,
+      "cost": 1200,
+      "assetKey": "unit.jet_f15",
+      "description": "Heavy twin-engine air supremacy fighter with extended operational range."
+    },
+    {
+      "id": "jet_su27",
+      "name": "Su-27 Flanker",
+      "role": "Air Superiority",
+      "speedMps": 240,
+      "rangeMeters": 24000,
+      "damage": 75,
+      "hp": 120,
+      "cost": 1100,
+      "assetKey": "unit.jet_su27",
+      "description": "Supermaneuverable long-range dogfighter designed for territorial defense."
+    },
+    {
+      "id": "jet_a10",
+      "name": "A-10 Thunderbolt",
+      "role": "Ground Attack",
+      "speedMps": 150,
+      "rangeMeters": 10000,
+      "damage": 110,
+      "hp": 150,
+      "cost": 800,
+      "assetKey": "unit.jet_a10",
+      "description": "Armored close air support platform armed with heavy rotary cannon."
+    }
+  ],
+  "interceptors": [
+    {
+      "id": "int_short",
+      "name": "Short-Range SAM",
+      "rangeMeters": 3000,
+      "hitChance": 0.60,
+      "cost": 150,
+      "reloadSeconds": 15,
+      "assetKey": "interceptor.int_short",
+      "description": "Point-defense missile for rapid interception of low-flying targets."
+    },
+    {
+      "id": "int_medium",
+      "name": "Medium-Range SAM",
+      "rangeMeters": 8000,
+      "hitChance": 0.70,
+      "cost": 300,
+      "reloadSeconds": 30,
+      "assetKey": "interceptor.int_medium",
+      "description": "Regional area defense missile covering suburban and tactical air corridors."
+    },
+    {
+      "id": "int_long",
+      "name": "Long-Range SAM",
+      "rangeMeters": 20000,
+      "hitChance": 0.80,
+      "cost": 600,
+      "reloadSeconds": 60,
+      "assetKey": "interceptor.int_long",
+      "description": "Strategic theater air shield with high accuracy against incoming sorties."
+    }
+  ],
+  "groundUnits": [
+    {
+      "id": "infantry_squad",
+      "name": "Rifle Infantry Squad",
+      "role": "Scout / Capture",
+      "speedMps": 5,
+      "rangeMeters": 1500,
+      "damage": 15,
+      "hp": 40,
+      "cost": 120,
+      "assetKey": "unit.infantry",
+      "description": "Mobile ground troops capable of capturing enemy mines and outposts."
+    },
+    {
+      "id": "armored_ifv",
+      "name": "Armored IFV",
+      "role": "Combat Vehicle",
+      "speedMps": 18,
+      "rangeMeters": 4000,
+      "damage": 40,
+      "hp": 120,
+      "cost": 450,
+      "assetKey": "unit.tank",
+      "description": "Light combat vehicle providing direct fire support against ground units."
+    }
+  ]
+}

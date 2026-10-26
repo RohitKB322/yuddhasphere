@@ -1,0 +1,1006 @@
+package com.yuddhasphere.state
+
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import com.yuddhasphere.models.*
+import com.yuddhasphere.utils.GeoMath
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.InputStreamReader
+import java.util.UUID
+import kotlin.math.cos
+import kotlin.math.sin
+
+class LocalGameState(private val context: Context) {
+
+    interface StateListener {
+        fun onPlayerUpdated(player: Player)
+        fun onStructuresUpdated(structures: List<Structure>)
+        fun onUnitsUpdated(units: List<UnitItem>)
+        fun onAlert(title: String, message: String)
+        fun onStructureUpgradeCompleted(structure: Structure)
+        fun onMissileFired(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double, missileType: String)
+    }
+
+    var player: Player = Player()
+    val structures: MutableList<Structure> = mutableListOf()
+    val activeUnits: MutableList<UnitItem> = mutableListOf()
+    val catalogBuildings: MutableMap<String, CatalogBuilding> = mutableMapOf()
+    val jetCatalog: MutableList<JetItem> = mutableListOf()
+    val interceptorCatalog: MutableList<InterceptorItem> = mutableListOf()
+    val alliances: MutableList<AllianceItem> = mutableListOf()
+    val treaties: MutableList<TreatyItem> = mutableListOf()
+    val combatReports: MutableList<CombatReportItem> = mutableListOf()
+
+    private val listeners: MutableList<StateListener> = mutableListOf()
+    private val handler = Handler(Looper.getMainLooper())
+    private var incomeAccumulator: Double = 0.0
+    private var hasInitialGpsFixed: Boolean = false
+
+    private val tickRunnable = object : Runnable {
+        override fun run() {
+            onGameTick()
+            handler.postDelayed(this, 1000)
+        }
+    }
+
+    init {
+        loadCatalogsFromAssets()
+        initializeStarterBase()
+        seedAlliancesAndReports()
+        handler.postDelayed(tickRunnable, 1000)
+    }
+
+    fun addListener(listener: StateListener) {
+        listeners.add(listener)
+        listener.onPlayerUpdated(player)
+        listener.onStructuresUpdated(structures)
+        listener.onUnitsUpdated(activeUnits)
+    }
+
+    fun removeListener(listener: StateListener) {
+        listeners.remove(listener)
+    }
+
+    private fun loadCatalogsFromAssets() {
+        try {
+            val configStream = context.assets.open("config.json")
+            val configJson = JSONObject(InputStreamReader(configStream).readText())
+
+            val gameObj = configJson.optJSONObject("game")
+            if (gameObj != null && player.wealth < 10000) {
+                player.wealth = gameObj.optInt("startingWealth", 10000)
+            }
+
+            val settlements = configJson.getJSONObject("settlementChain")
+            val keys = settlements.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val obj = settlements.getJSONObject(key)
+                catalogBuildings[key] = CatalogBuilding(
+                    type = key,
+                    name = obj.getString("name"),
+                    category = "settlement",
+                    radiusMeters = obj.getDouble("radiusMeters"),
+                    radiusType = "influence",
+                    incomePerHour = obj.getInt("incomePerHour"),
+                    hp = obj.getInt("hp"),
+                    buildCost = obj.getInt("buildCost"),
+                    description = "Settlement expanding territory and income.",
+                    nextLevelType = if (obj.has("nextLevel") && !obj.isNull("nextLevel")) obj.getString("nextLevel") else null,
+                    upgradeCost = obj.optInt("upgradeCost", 0),
+                    upgradeDurationSeconds = obj.optInt("upgradeDurationSeconds", 0)
+                )
+            }
+
+            val others = configJson.getJSONObject("otherBuildings")
+            val otherKeys = others.keys()
+            while (otherKeys.hasNext()) {
+                val key = otherKeys.next()
+                val obj = others.getJSONObject(key)
+                catalogBuildings[key] = CatalogBuilding(
+                    type = key,
+                    name = obj.getString("name"),
+                    category = obj.getString("category"),
+                    radiusMeters = obj.getDouble("radiusMeters"),
+                    radiusType = obj.getString("radiusType"),
+                    incomePerHour = obj.getInt("incomePerHour"),
+                    hp = obj.getInt("hp"),
+                    buildCost = obj.getInt("buildCost"),
+                    description = obj.optString("description", "")
+                )
+            }
+
+            val catalogStream = context.assets.open("catalogs.json")
+            val catalogJson = JSONObject(InputStreamReader(catalogStream).readText())
+
+            val jetsArray = catalogJson.getJSONArray("jets")
+            for (i in 0 until jetsArray.length()) {
+                val j = jetsArray.getJSONObject(i)
+                jetCatalog.add(
+                    JetItem(
+                        id = j.getString("id"),
+                        name = j.getString("name"),
+                        role = j.getString("role"),
+                        speedMps = j.getInt("speedMps"),
+                        rangeMeters = j.getInt("rangeMeters"),
+                        damage = j.getInt("damage"),
+                        hp = j.getInt("hp"),
+                        cost = j.getInt("cost"),
+                        weapons = when (j.getString("id")) {
+                            "jet_a10" -> "4x GBU-12 Guided Bombs • 30mm GAU-8 Cannon"
+                            "jet_f15", "jet_su27" -> "4x AIM-120 AMRAAM • 2x GBU-12"
+                            else -> "2x GBU-12 Laser-Guided • 2x AIM-120 AMRAAM"
+                        },
+                        description = j.getString("description")
+                    )
+                )
+            }
+
+            val intArr = catalogJson.getJSONArray("interceptors")
+            for (i in 0 until intArr.length()) {
+                val intObj = intArr.getJSONObject(i)
+                interceptorCatalog.add(
+                    InterceptorItem(
+                        id = intObj.getString("id"),
+                        name = intObj.getString("name"),
+                        rangeMeters = intObj.getInt("rangeMeters"),
+                        hitChance = intObj.getDouble("hitChance"),
+                        cost = intObj.getInt("cost"),
+                        reloadSeconds = intObj.getInt("reloadSeconds"),
+                        description = intObj.getString("description")
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun initializeStarterBase() {
+        if (structures.isEmpty()) {
+            val starterHq = Structure(
+                id = "hq_" + UUID.randomUUID().toString().take(8),
+                ownerId = player.id,
+                team = player.team,
+                teamColor = player.teamColor,
+                type = "town_hall",
+                name = "Command Citadel (HQ)",
+                level = 1,
+                position = player.position,
+                hp = 1000,
+                maxHp = 1000,
+                radiusMeters = 500.0,
+                radiusType = "territory",
+                online = true
+            )
+            structures.add(starterHq)
+            recalculateIncome()
+        }
+    }
+
+    fun onFirstLocationFix(pos: GeoPoint) {
+        if (!hasInitialGpsFixed) {
+            hasInitialGpsFixed = true
+            player.position = pos
+            val hqIndex = structures.indexOfFirst { it.type == "town_hall" && it.ownerId == player.id }
+            if (hqIndex != -1 && structures.size == 1) {
+                structures[hqIndex] = structures[hqIndex].copy(position = pos)
+            }
+            listeners.forEach {
+                it.onPlayerUpdated(player)
+                it.onStructuresUpdated(structures)
+            }
+        }
+    }
+
+    private fun onGameTick() {
+        var stateChanged = false
+
+        // 1. Income accumulation
+        incomeAccumulator += (player.incomePerHour.toDouble() / 3600.0)
+        if (incomeAccumulator >= 1.0) {
+            val gain = incomeAccumulator.toInt()
+            player.wealth += gain
+            incomeAccumulator -= gain
+            stateChanged = true
+        }
+
+        // 2. Building upgrade timers
+        val now = System.currentTimeMillis()
+        structures.forEach { s ->
+            if (s.upgradeFinishedAt != null && now >= s.upgradeFinishedAt!!) {
+                s.upgradeFinishedAt = null
+                completeUpgrade(s)
+                stateChanged = true
+            }
+        }
+
+        // 3. Flight Sortie Physics & Mechanics
+        if (activeUnits.isNotEmpty()) {
+            val iterator = activeUnits.iterator()
+            var unitsChanged = false
+
+            while (iterator.hasNext()) {
+                val u = iterator.next()
+                unitsChanged = true
+
+                // Fuel consumption: Subsonic (0.35%/s), Supersonic (1.10%/s)
+                val burnRate = if (u.speedMode == "supersonic") 1.10 else 0.35
+                u.fuelPercent = (u.fuelPercent - burnRate).coerceAtLeast(0.0)
+
+                // Bingo Fuel check (<= 20%): triggers emergency RTB
+                if (u.fuelPercent <= 20.0 && u.order != "rtb") {
+                    u.order = "rtb"
+                    listeners.forEach { it.onAlert("BINGO FUEL!", "${u.name} reached 20% fuel. Returning to base immediately!") }
+                }
+
+                // If fuel completely empty (0%), jet is lost
+                if (u.fuelPercent <= 0.0) {
+                    iterator.remove()
+                    recoverOrDestroyHangarJet(u.homeBaseId, u.id, destroyed = true)
+                    listeners.forEach { it.onAlert("AIRCRAFT LOST", "${u.name} ran out of fuel and crashed!") }
+                    continue
+                }
+
+                val homeBase = structures.find { it.id == u.homeBaseId }
+                val homePos = homeBase?.position ?: u.originPosition
+
+                // Movement resolution
+                val dest = if (u.order == "rtb") homePos else u.targetPosition
+                val distRemaining = GeoMath.calculateDistanceMeters(u.position, dest)
+
+                if (u.order == "patrol") {
+                    // Circular orbit patrol around waypoint
+                    if (distRemaining > 150.0) {
+                        // Fly to patrol center
+                        advancePositionTowards(u, dest, distRemaining)
+                    } else {
+                        // Orbit around patrol point
+                        val prevLat = u.position.lat
+                        val prevLng = u.position.lng
+                        u.patrolAngle += (if (u.speedMode == "supersonic") 0.25 else 0.12)
+                        val rDeg = 0.0018 // ~200 meters orbit
+                        val orbLat = dest.lat + rDeg * sin(u.patrolAngle)
+                        val orbLng = dest.lng + rDeg * cos(u.patrolAngle)
+                        u.position = GeoPoint(orbLat, orbLng)
+                        val dLat = orbLat - prevLat
+                        val dLng = orbLng - prevLng
+                        val angleDeg = Math.toDegrees(Math.atan2(dLng, dLat))
+                        u.heading = (angleDeg + 360.0) % 360.0
+                    }
+                } else if (u.order == "strike") {
+                    if (distRemaining < 120.0) {
+                        // Delivered strike!
+                        listeners.forEach {
+                            it.onMissileFired(u.position.lat, u.position.lng, dest.lat, dest.lng, "air_to_ground")
+                        }
+                        if (u.targetStructureId != null) {
+                            val targetStruct = structures.find { it.id == u.targetStructureId }
+                            if (targetStruct != null) {
+                                targetStruct.hp = (targetStruct.hp - u.damage).coerceAtLeast(0)
+                                if (targetStruct.hp <= 0) {
+                                    structures.remove(targetStruct)
+                                    recalculateIncome()
+                                    listeners.forEach { it.onAlert("TARGET DESTROYED!", "${targetStruct.name} neutralized by strike!") }
+                                } else {
+                                    listeners.forEach { it.onAlert("DIRECT HIT!", "Payload hit ${targetStruct.name} (-${u.damage} HP)!") }
+                                }
+                            }
+                        } else {
+                            listeners.forEach { it.onAlert("Strike Delivered", "${u.name} hit target coordinates!") }
+                        }
+                        u.order = "rtb"
+                    } else {
+                        advancePositionTowards(u, dest, distRemaining)
+                    }
+                } else if (u.order == "rtb") {
+                    if (distRemaining < 80.0) {
+                        // Landed safely
+                        iterator.remove()
+                        recoverOrDestroyHangarJet(u.homeBaseId, u.id, destroyed = false)
+                        listeners.forEach { it.onAlert("AIRCRAFT RECOVERED", "${u.name} landed safely, refueled and rearmed.") }
+                        continue
+                    } else {
+                        advancePositionTowards(u, dest, distRemaining)
+                    }
+                }
+
+                // SAM Defense Interception Check
+                val samBatteries = structures.filter { it.type == "sam" && it.online && it.samMunitions > 0 }
+                for (sam in samBatteries) {
+                    if (u.order != "rtb") {
+                        val distToSam = GeoMath.calculateDistanceMeters(u.position, sam.position)
+                        if (distToSam <= sam.radiusMeters) {
+                            sam.samMunitions -= 1
+                            listeners.forEach {
+                                it.onMissileFired(sam.position.lat, sam.position.lng, u.position.lat, u.position.lng, "sam_interceptor")
+                            }
+                            // Interception test (35% test chance)
+                            if (Math.random() < 0.35) {
+                                iterator.remove()
+                                recoverOrDestroyHangarJet(u.homeBaseId, u.id, destroyed = true)
+                                listeners.forEach { it.onAlert("INTERCEPTED!", "SAM Battery interceptor destroyed ${u.name}!") }
+                                break
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (unitsChanged) {
+                listeners.forEach { it.onUnitsUpdated(activeUnits) }
+            }
+        }
+
+        if (stateChanged) {
+            listeners.forEach { it.onPlayerUpdated(player) }
+            listeners.forEach { it.onStructuresUpdated(structures) }
+        }
+    }
+
+    private fun advancePositionTowards(u: UnitItem, dest: GeoPoint, distRemaining: Double) {
+        val speedMps = if (u.speedMode == "supersonic") 520.0 else 220.0
+        val stepRatio = (speedMps / distRemaining).coerceAtMost(0.35)
+        val dLat = dest.lat - u.position.lat
+        val dLng = dest.lng - u.position.lng
+        val newLat = u.position.lat + dLat * stepRatio
+        val newLng = u.position.lng + dLng * stepRatio
+        u.position = GeoPoint(newLat, newLng)
+        val angleDeg = Math.toDegrees(Math.atan2(dLng, dLat))
+        u.heading = (angleDeg + 360.0) % 360.0
+    }
+
+    private fun recoverOrDestroyHangarJet(homeBaseId: String, unitId: String, destroyed: Boolean) {
+        val base = structures.find { it.id == homeBaseId } ?: return
+        val jetIndex = base.hangarJets.indexOfFirst { it.id == unitId }
+        if (jetIndex != -1) {
+            if (destroyed) {
+                base.hangarJets.removeAt(jetIndex)
+            } else {
+                base.hangarJets[jetIndex].status = "Ready in Hangar"
+            }
+        }
+    }
+
+    // --- HANGAR & SORTIE ACTIONS ---
+
+    fun buyJetForAirbase(airbaseId: String, jetCatalogId: String): Pair<Boolean, String> {
+        val base = structures.find { it.id == airbaseId } ?: return Pair(false, "Airbase not found.")
+        val jet = jetCatalog.find { it.id == jetCatalogId } ?: return Pair(false, "Unknown jet type.")
+
+        if (base.hangarJets.size >= base.maxHangarSlots()) {
+            return Pair(false, "Hangar full! (${base.hangarJets.size}/${base.maxHangarSlots()} slots). Upgrade Airbase to expand slots.")
+        }
+
+        if (player.wealth < jet.cost) {
+            return Pair(false, "Insufficient funds ($${player.wealth} < $${jet.cost}).")
+        }
+
+        player.wealth -= jet.cost
+        val hangarJet = HangarJetItem(
+            id = "jet_" + UUID.randomUUID().toString().take(6),
+            catalogId = jet.id,
+            name = jet.name,
+            role = jet.role,
+            hp = jet.hp,
+            maxHp = jet.hp,
+            status = "Ready in Hangar"
+        )
+        base.hangarJets.add(hangarJet)
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("Jet Procured", "${jet.name} delivered to Hangar (Slot ${base.hangarJets.size}/${base.maxHangarSlots()}).")
+        }
+        return Pair(true, "${jet.name} added to Hangar.")
+    }
+
+    fun launchSortieFromHangar(
+        airbaseId: String,
+        hangarJetId: String,
+        targetPos: GeoPoint,
+        targetStructureId: String?,
+        order: String = "strike"
+    ): Pair<Boolean, String> {
+        val base = structures.find { it.id == airbaseId } ?: return Pair(false, "Airbase not found.")
+        val jet = base.hangarJets.find { it.id == hangarJetId } ?: return Pair(false, "Jet not found in Hangar.")
+
+        if (jet.status != "Ready in Hangar") {
+            return Pair(false, "Jet is currently ${jet.status}.")
+        }
+
+        val cat = jetCatalog.find { it.id == jet.catalogId }
+        val distToTarget = GeoMath.calculateDistanceMeters(base.position, targetPos)
+        val maxRange = cat?.rangeMeters ?: 15000
+
+        if (distToTarget > maxRange) {
+            return Pair(false, "Target beyond combat radius (${(distToTarget / 1000).toInt()}km > ${(maxRange / 1000)}km).")
+        }
+
+        jet.status = "In Flight"
+        val sortie = UnitItem(
+            id = jet.id,
+            ownerId = player.id,
+            team = player.team,
+            teamColor = player.teamColor,
+            catalogId = jet.catalogId,
+            name = jet.name,
+            position = base.position,
+            originPosition = base.position,
+            targetPosition = targetPos,
+            targetStructureId = targetStructureId,
+            hp = jet.hp,
+            maxHp = jet.maxHp,
+            order = order,
+            speedMode = "subsonic",
+            speedMps = cat?.speedMps?.toDouble() ?: 220.0,
+            rangeMeters = maxRange,
+            fuelPercent = 100.0,
+            weaponsLoadout = cat?.weapons ?: "2x GBU-12 Guided Bombs • 2x AIM-120",
+            damage = cat?.damage ?: 60,
+            homeBaseId = base.id
+        )
+
+        activeUnits.add(sortie)
+        addCombatReport("combat", "Sortie Scrambled", "${jet.name} scrambled from Hangar on ${order.uppercase()} vector.", "info")
+        listeners.forEach {
+            it.onStructuresUpdated(structures)
+            it.onUnitsUpdated(activeUnits)
+            it.onAlert("Sortie Scrambled!", "${jet.name} launched on ${order.uppercase()} mission!")
+        }
+        return Pair(true, "Sortie scrambled.")
+    }
+
+    fun setUnitSpeedMode(unitId: String, mode: String): Boolean {
+        val u = activeUnits.find { it.id == unitId } ?: return false
+        u.speedMode = mode
+        u.speedMps = if (mode == "supersonic") 520.0 else 220.0
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            it.onAlert("Speed Mode Changed", "${u.name} set to ${mode.uppercase()} (${if (mode == "supersonic") "Afterburner • 3x Fuel Burn" else "Cruising Speed"}).")
+        }
+        return true
+    }
+
+    fun abortUnitMissionRtb(unitId: String): Boolean {
+        val u = activeUnits.find { it.id == unitId } ?: return false
+        u.order = "rtb"
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            it.onAlert("Mission Aborted", "${u.name} aborted mission. Heading back to base.")
+        }
+        return true
+    }
+
+    fun retargetUnitSortie(unitId: String, newTarget: GeoPoint, targetStructId: String?): Boolean {
+        val u = activeUnits.find { it.id == unitId } ?: return false
+        u.targetPosition = newTarget
+        u.targetStructureId = targetStructId
+        u.order = "strike"
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            it.onAlert("Target Updated", "${u.name} vector updated to new target!")
+        }
+        return true
+    }
+
+    fun setUnitPatrol(unitId: String, patrolPos: GeoPoint): Boolean {
+        val u = activeUnits.find { it.id == unitId } ?: return false
+        u.targetPosition = patrolPos
+        u.order = "patrol"
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            it.onAlert("Patrol Assigned", "${u.name} assigned to Air Patrol.")
+        }
+        return true
+    }
+
+    fun buySamMunitions(samId: String): Pair<Boolean, String> {
+        val sam = structures.find { it.id == samId } ?: return Pair(false, "SAM site not found.")
+        val cost = 300
+        if (player.wealth < cost) {
+            return Pair(false, "Insufficient funds ($$cost).")
+        }
+        player.wealth -= cost
+        sam.samMunitions = (sam.samMunitions + 4).coerceAtMost(sam.maxSamSlots())
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("SAM Re-Armed", "Loaded interceptor missiles into battery (${sam.samMunitions}/${sam.maxSamSlots()}).")
+        }
+        return Pair(true, "+4 Interceptors armed.")
+    }
+
+    fun armSamSlot(samId: String): Pair<Boolean, String> {
+        val sam = structures.find { it.id == samId } ?: return Pair(false, "SAM battery not found.")
+        if (sam.samMunitions >= sam.maxSamSlots()) {
+            return Pair(false, "SAM battery silos full (${sam.samMunitions}/${sam.maxSamSlots()}).")
+        }
+        val cost = 150
+        if (player.wealth < cost) {
+            return Pair(false, "Insufficient funds ($$cost required).")
+        }
+        player.wealth -= cost
+        sam.samMunitions += 1
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("Silo Armed", "Loaded 1x Interceptor into Silo #${sam.samMunitions}.")
+        }
+        return Pair(true, "Missile armed.")
+    }
+
+    fun setUnitRoe(unitId: String, roe: String): Boolean {
+        val u = activeUnits.find { it.id == unitId } ?: return false
+        u.roe = roe
+        val roeLabel = when (roe) {
+            "aggressive" -> "AGGRESSIVE (Seek & Destroy)"
+            "fire_at_will" -> "FIRE AT WILL (Engage targets in cone)"
+            else -> "PEACEFUL (Hold Fire / Recon)"
+        }
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            it.onAlert("ROE Updated", "${u.name} set to $roeLabel")
+        }
+        return true
+    }
+
+    fun setUnitRadarCone(unitId: String, angle: Int): Boolean {
+        val u = activeUnits.find { it.id == unitId } ?: return false
+        u.radarConeAngle = angle
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            it.onAlert("Radar Aperture", "${u.name} radar aperture set to ${angle}° sector")
+        }
+        return true
+    }
+
+    fun fireManualMissile(unitId: String): Pair<Boolean, String> {
+        val u = activeUnits.find { it.id == unitId } ?: return Pair(false, "Unit not found.")
+        val targetPos = u.targetPosition
+        listeners.forEach {
+            it.onMissileFired(u.position.lat, u.position.lng, targetPos.lat, targetPos.lng, "air_to_air")
+            it.onAlert("FOX TWO!", "${u.name} launched missile at target coordinates!")
+        }
+        return Pair(true, "Missile launched!")
+    }
+
+    // --- STANDARD BUILDING ACTIONS ---
+
+    fun buildStructure(type: String, targetPos: GeoPoint): Pair<Boolean, String> {
+        val cat = catalogBuildings[type] ?: return Pair(false, "Unknown building type.")
+
+        if (player.wealth < cat.buildCost) {
+            return Pair(false, "Insufficient funds! Need $${cat.buildCost}, you have $${player.wealth}.")
+        }
+
+        val distFromPlayer = GeoMath.calculateDistanceMeters(player.position, targetPos)
+        if (distFromPlayer > 800.0) {
+            return Pair(false, "Location too far from Commander (${distFromPlayer.toInt()}m > 800m max). Tap '🎯 At GPS' to build beside you.")
+        }
+
+        if (!GeoMath.satisfiesSeparation(targetPos, structures, 20.0)) {
+            return Pair(false, "Too close to an existing structure (minimum 20m separation required).")
+        }
+
+        if (type != "town_hall") {
+            val inside = GeoMath.isInsideTerritory(targetPos, structures, player.id)
+            if (!inside) {
+                val hq = structures.find { it.type == "town_hall" && it.ownerId == player.id }
+                if (hq != null) {
+                    val distToHq = GeoMath.calculateDistanceMeters(targetPos, hq.position)
+                    if (distToHq > 1000.0 && structures.size == 1) {
+                        val idx = structures.indexOf(hq)
+                        structures[idx] = hq.copy(position = player.position)
+                    } else {
+                        return Pair(false, "Must be placed inside your territory radius (within 500m of your Command Citadel).")
+                    }
+                }
+            }
+        }
+
+        player.wealth -= cat.buildCost
+        val newStructure = Structure(
+            id = "str_" + UUID.randomUUID().toString().take(8),
+            ownerId = player.id,
+            team = player.team,
+            teamColor = player.teamColor,
+            type = type,
+            name = cat.name,
+            level = 1,
+            position = targetPos,
+            hp = cat.hp,
+            maxHp = cat.hp,
+            radiusMeters = cat.radiusMeters,
+            radiusType = cat.radiusType,
+            online = true
+        )
+        structures.add(newStructure)
+        recalculateIncome()
+        addCombatReport("economy", "Structure Deployed", "${cat.name} constructed (+$$${cat.incomePerHour}/hr).", "info")
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("Deployment Confirmed", "${cat.name} constructed successfully!")
+        }
+
+        return Pair(true, "Deployment successful.")
+    }
+
+    fun upgradeStructure(structureId: String): Pair<Boolean, String> {
+        val s = structures.find { it.id == structureId } ?: return Pair(false, "Structure not found.")
+        val cat = catalogBuildings[s.type] ?: return Pair(false, "No upgrade available.")
+
+        val nextType = cat.nextLevelType
+        if (nextType == null || cat.upgradeCost <= 0) {
+            return Pair(false, "Structure is already at maximum level.")
+        }
+
+        if (s.upgradeFinishedAt != null) {
+            return Pair(false, "Upgrade already in progress.")
+        }
+
+        if (player.wealth < cat.upgradeCost) {
+            return Pair(false, "Insufficient funds ($${player.wealth} < $${cat.upgradeCost}).")
+        }
+
+        player.wealth -= cat.upgradeCost
+        val durationSeconds = if (cat.upgradeDurationSeconds > 0) cat.upgradeDurationSeconds else 30
+        s.upgradeFinishedAt = System.currentTimeMillis() + (durationSeconds * 1000L)
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("Upgrade Initiated", "Upgrading ${s.name} (Ready in ${durationSeconds}s)")
+        }
+
+        return Pair(true, "Upgrade started.")
+    }
+
+    private fun completeUpgrade(s: Structure) {
+        val cat = catalogBuildings[s.type] ?: return
+        val nextType = cat.nextLevelType ?: return
+        val nextCat = catalogBuildings[nextType] ?: return
+
+        s.type = nextType
+        s.name = nextCat.name
+        s.level += 1
+        s.maxHp = nextCat.hp
+        s.hp = nextCat.hp
+        s.radiusMeters = nextCat.radiusMeters
+        s.radiusType = nextCat.radiusType
+
+        recalculateIncome()
+        addCombatReport("economy", "Upgrade Completed", "${s.name} is now Level ${s.level} (HP: ${s.maxHp})!", "info")
+        listeners.forEach {
+            it.onStructureUpgradeCompleted(s)
+            it.onAlert("Upgrade Complete!", "${s.name} is now Level ${s.level}!")
+        }
+    }
+
+    fun repairStructure(structureId: String): Pair<Boolean, String> {
+        val s = structures.find { it.id == structureId } ?: return Pair(false, "Structure not found.")
+        if (s.hp >= s.maxHp) {
+            return Pair(false, "Structure already at full HP.")
+        }
+        val repairCost = 50
+        if (player.wealth < repairCost) {
+            return Pair(false, "Insufficient funds for repair ($$repairCost).")
+        }
+        player.wealth -= repairCost
+        s.hp = s.maxHp
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("Repairs Complete", "${s.name} fully restored to ${s.maxHp} HP.")
+        }
+        return Pair(true, "Repaired.")
+    }
+
+    fun sellStructure(structureId: String): Pair<Boolean, String> {
+        val index = structures.indexOfFirst { it.id == structureId }
+        if (index == -1) return Pair(false, "Structure not found.")
+        val s = structures[index]
+        if (s.type == "town_hall") {
+            return Pair(false, "Cannot sell Command Citadel (HQ).")
+        }
+
+        val cat = catalogBuildings[s.type]
+        val refund = ((cat?.buildCost ?: 300) * 0.5).toInt()
+        player.wealth += refund
+        structures.removeAt(index)
+        recalculateIncome()
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("Structure Sold", "${s.name} decommissioned. +$$refund refunded.")
+        }
+        return Pair(true, "Sold for +$$refund.")
+    }
+
+    fun updatePlayerLocation(newPos: GeoPoint, accuracy: Double) {
+        if (!hasInitialGpsFixed) {
+            onFirstLocationFix(newPos)
+        } else {
+            player.position = newPos
+            player.accuracy = accuracy
+            listeners.forEach { it.onPlayerUpdated(player) }
+        }
+    }
+
+    fun updateCommanderProfile(name: String, tag: String, colorHex: String) {
+        player.callsign = name
+        player.allianceTag = tag
+        player.teamColor = colorHex
+        listeners.forEach { it.onPlayerUpdated(player) }
+    }
+
+    private fun recalculateIncome() {
+        var total = 0
+        structures.forEach { s ->
+            if (s.online) {
+                val cat = catalogBuildings[s.type]
+                total += cat?.incomePerHour ?: 0
+            }
+        }
+        player.incomePerHour = total
+        listeners.forEach { it.onPlayerUpdated(player) }
+    }
+
+    fun getStructuresJson(): String {
+        val arr = JSONArray()
+        structures.forEach { arr.put(it.toJsonObject()) }
+        return arr.toString()
+    }
+
+    fun getUnitsJson(): String {
+        val arr = JSONArray()
+        activeUnits.forEach { arr.put(it.toJsonObject()) }
+        return arr.toString()
+    }
+
+    // --- MILESTONE 4: ALLIANCES, TREATIES & COMBAT REPORTS ---
+
+    private fun seedAlliancesAndReports() {
+        alliances.clear()
+        treaties.clear()
+        player.allianceTag = ""
+        player.allianceId = null
+        player.allianceRole = "Member"
+
+        combatReports.clear()
+        combatReports.add(
+            CombatReportItem(
+                id = "rep_1",
+                timestamp = System.currentTimeMillis() - 45000,
+                category = "combat",
+                urgencyTag = "🚨 WAR BULLETIN",
+                title = "MASSIVE AIR INCURSION INTERCEPTED OVER SECTOR 4",
+                detail = "PATRIOT-Alpha Air Defense Battery tracked and engaged supersonic hostile strike formation. 1x Bogey neutralized with zero collateral damage recorded in perimeter.",
+                level = "danger",
+                sector = "Sector 4 [Air Corridor]"
+            )
+        )
+        combatReports.add(
+            CombatReportItem(
+                id = "rep_2",
+                timestamp = System.currentTimeMillis() - 180000,
+                category = "radar",
+                urgencyTag = "📡 AIR RADAR FLASH",
+                title = "UNIDENTIFIED SUPERSONIC TARGET DETECTED",
+                detail = "Long-range phased array acquired high-altitude radar cross-section closing at Mach 1.6 bearing 035. Air defense grid elevated to Condition Amber.",
+                level = "warn",
+                sector = "Sector 7 [Radar Dome]"
+            )
+        )
+        combatReports.add(
+            CombatReportItem(
+                id = "rep_3",
+                timestamp = System.currentTimeMillis() - 600000,
+                category = "economy",
+                urgencyTag = "💰 TREASURY DISPATCH",
+                title = "REGIONAL OIL & CITADEL REVENUE HARVESTED",
+                detail = "Command Citadel automated fiscal ledgers recorded +$450 credits in resource royalties and regional trade duties.",
+                level = "info",
+                sector = "HQ Command Citadel"
+            )
+        )
+        combatReports.add(
+            CombatReportItem(
+                id = "rep_4",
+                timestamp = System.currentTimeMillis() - 1200000,
+                category = "diplomacy",
+                urgencyTag = "🌐 DIPLOMATIC WIRE",
+                title = "FACTION CHARTERS OPENED GLOBALLY",
+                detail = "Supreme Defense Command authorized commanders to charter sovereign alliances, appoint ministerial cabinets, and enforce border sovereignty.",
+                level = "info",
+                sector = "Global Command Nexus"
+            )
+        )
+    }
+
+    fun addCombatReport(category: String, title: String, detail: String, level: String = "info", urgencyTag: String = "BREAKING ALERT", sector: String = "Tactical Grid") {
+        val rep = CombatReportItem("rep_${System.currentTimeMillis()}", System.currentTimeMillis(), category, urgencyTag, title, detail, level, sector)
+        combatReports.add(0, rep)
+        if (combatReports.size > 50) {
+            combatReports.removeAt(combatReports.size - 1)
+        }
+    }
+
+    fun createAlliance(name: String, tag: String, motto: String, colorHex: String): Pair<Boolean, String> {
+        val cleanTag = if (tag.startsWith("[")) tag.uppercase() else "[${tag.uppercase()}]"
+        val leaderMember = AllianceMember(
+            playerId = player.id,
+            callsign = player.callsign,
+            role = "Supreme Commander",
+            netWorth = player.calculateNetWorth(structures),
+            joinedAt = System.currentTimeMillis()
+        )
+        val newAlliance = AllianceItem(
+            id = "all_" + UUID.randomUUID().toString().take(6),
+            name = name,
+            tag = cleanTag,
+            leaderId = player.id,
+            leaderCallsign = player.callsign,
+            members = mutableListOf(leaderMember),
+            totalWealth = player.calculateNetWorth(structures),
+            territorySqKm = 1.0,
+            taxRatePercent = 10,
+            treasuryCredits = 5000,
+            colorHex = colorHex,
+            motto = motto.ifEmpty { "Forward to victory." },
+            createdAt = System.currentTimeMillis()
+        )
+        alliances.add(0, newAlliance)
+        player.allianceId = newAlliance.id
+        player.allianceTag = cleanTag
+        player.allianceRole = "Supreme Commander"
+        addCombatReport("diplomacy", "ALLIANCE CHARTERED: $name $cleanTag", "Commander ${player.callsign} established sovereign alliance $name $cleanTag as Supreme Commander.", "info", "🌐 SOVEREIGN CHARTER", "Supreme Command")
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onAlert("Alliance Established", "Welcome to $name $cleanTag!")
+        }
+        return Pair(true, "Alliance $cleanTag created!")
+    }
+
+    fun joinAlliance(allianceId: String): Pair<Boolean, String> {
+        val target = alliances.find { it.id == allianceId } ?: return Pair(false, "Alliance not found.")
+        val newMember = AllianceMember(
+            playerId = player.id,
+            callsign = player.callsign,
+            role = "Member",
+            netWorth = player.calculateNetWorth(structures),
+            joinedAt = System.currentTimeMillis()
+        )
+        target.members.add(newMember)
+        player.allianceId = target.id
+        player.allianceTag = target.tag
+        player.allianceRole = "Member"
+        addCombatReport("diplomacy", "ENLISTED: ${target.name} ${target.tag}", "Commander ${player.callsign} enlisted as combat Member in ${target.name} ${target.tag}.", "info", "🤝 ENLISTMENT CONFIRMED", "Alliance Headquarters")
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onAlert("Enlistment Confirmed", "Enlisted into ${target.name} ${target.tag}!")
+        }
+        return Pair(true, "Enlisted into ${target.tag}.")
+    }
+
+    fun leaveAlliance(): Pair<Boolean, String> {
+        val currentAll = alliances.find { it.id == player.allianceId }
+        val oldTag = player.allianceTag
+        if (currentAll != null) {
+            currentAll.members.removeAll { it.playerId == player.id }
+            if (currentAll.members.isEmpty()) {
+                alliances.remove(currentAll)
+            } else if (currentAll.leaderId == player.id) {
+                currentAll.members[0].role = "Supreme Commander"
+                currentAll.leaderId = currentAll.members[0].playerId
+                currentAll.leaderCallsign = currentAll.members[0].callsign
+            }
+        }
+        player.allianceId = null
+        player.allianceTag = ""
+        player.allianceRole = "Member"
+        addCombatReport("diplomacy", "FACTION DEPARTURE", "Commander ${player.callsign} departed $oldTag and returned to Independent Command.", "warn", "⚡ DISBAND / LEAVE", "Field Sector")
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onAlert("Alliance Departed", "Returned to Independent status.")
+        }
+        return Pair(true, "Departed alliance.")
+    }
+
+    fun setTaxRate(taxPercent: Int): Pair<Boolean, String> {
+        val all = alliances.find { it.id == player.allianceId } ?: return Pair(false, "No active alliance.")
+        if (player.allianceRole != "Supreme Commander" && player.allianceRole != "Financial Minister") {
+            return Pair(false, "Only Supreme Commander or Financial Minister can adjust taxation.")
+        }
+        all.taxRatePercent = taxPercent.coerceIn(0, 30)
+        addCombatReport("economy", "ALLIANCE TAX SET TO ${all.taxRatePercent}%", "Alliance fiscal rate adjusted to ${all.taxRatePercent}%.", "info", "💰 TREASURY FLASH", "Fiscal Ministry")
+        listeners.forEach { it.onAlert("Tax Rate Updated", "Alliance taxation set to ${all.taxRatePercent}%") }
+        return Pair(true, "Tax rate set to ${all.taxRatePercent}%.")
+    }
+
+    fun promoteMember(targetPlayerId: String, newRole: String): Pair<Boolean, String> {
+        val all = alliances.find { it.id == player.allianceId } ?: return Pair(false, "No active alliance.")
+        if (player.allianceRole != "Supreme Commander") {
+            return Pair(false, "Only Supreme Commander can reassign cabinet posts.")
+        }
+        val member = all.members.find { it.playerId == targetPlayerId } ?: return Pair(false, "Member not found.")
+        member.role = newRole
+        if (targetPlayerId == player.id) {
+            player.allianceRole = newRole
+        }
+        addCombatReport("diplomacy", "CABINET APPOINTMENT: $newRole", "Commander ${member.callsign} promoted to $newRole.", "info", "👑 PROMOTION ORDER", "Supreme Command")
+        listeners.forEach { it.onAlert("Cabinet Assigned", "${member.callsign} is now $newRole.") }
+        return Pair(true, "${member.callsign} appointed as $newRole.")
+    }
+
+    fun setTreatyStatus(targetAllianceId: String, status: String): Pair<Boolean, String> {
+        val all = alliances.find { it.id == player.allianceId } ?: return Pair(false, "You must be in an alliance.")
+        if (player.allianceRole != "Supreme Commander" && player.allianceRole != "Foreign Minister") {
+            return Pair(false, "Only Supreme Commander or Foreign Minister can ratify treaties.")
+        }
+        val target = alliances.find { it.id == targetAllianceId } ?: return Pair(false, "Target alliance not found.")
+        val existing = treaties.find { it.allianceIdB == targetAllianceId }
+        if (existing != null) {
+            existing.status = status
+            existing.updatedAt = System.currentTimeMillis()
+        } else {
+            treaties.add(TreatyItem("try_${System.currentTimeMillis()}", all.id, targetAllianceId, target.name, target.tag, status))
+        }
+
+        val statusLabel = when (status) {
+            "pact" -> "Mutual Defense Pact"
+            "war" -> "State of War"
+            else -> "Ceasefire / Neutrality"
+        }
+        val level = if (status == "war") "danger" else "info"
+        val tagUrgency = if (status == "war") "🚨 WAR DECLARATION" else "🤝 DIPLOMATIC TREATY"
+        addCombatReport("diplomacy", "TREATY RATIFIED: $statusLabel", "Diplomatic status with ${target.name} ${target.tag} set to $statusLabel.", level, tagUrgency, "Foreign Ministry")
+
+        listeners.forEach {
+            it.onAlert("Treaty Ratified", "Status with ${target.tag} updated to $statusLabel.")
+        }
+        return Pair(true, "Treaty updated.")
+    }
+
+    fun getLeaderboard(metric: String): List<LeaderboardItem> {
+        val list = mutableListOf<LeaderboardItem>()
+        if (metric == "territory") {
+            alliances.sortedByDescending { it.territorySqKm }.forEachIndexed { idx, all ->
+                list.add(
+                    LeaderboardItem(
+                        rank = idx + 1,
+                        name = all.name,
+                        tag = all.tag,
+                        score = (all.territorySqKm * 10).toInt(),
+                        detail = "${all.territorySqKm} km² controlled",
+                        type = "alliance"
+                    )
+                )
+            }
+        } else if (metric == "xp") {
+            list.add(LeaderboardItem(1, player.callsign, player.allianceTag, player.xp + 450, "Rank: ${player.rank}", "player"))
+            list.add(LeaderboardItem(2, "General Vane", "[NEX]", 1150, "Rank: General (Grade III)", "player"))
+            list.add(LeaderboardItem(3, "Admiral Sterling", "[AEG]", 980, "Rank: Fleet Admiral", "player"))
+            list.add(LeaderboardItem(4, "Colonel Ray", "[SOL]", 820, "Rank: Wing Commander", "player"))
+            list.add(LeaderboardItem(5, "Major Briggs", "[SOL]", 650, "Rank: Tactical Major", "player"))
+        } else {
+            // Wealth
+            list.add(LeaderboardItem(1, player.callsign, player.allianceTag, player.calculateNetWorth(structures), "Net Worth: $%,d".format(player.calculateNetWorth(structures)), "player"))
+            list.add(LeaderboardItem(2, "Nexus Syndicate", "[NEX]", 112000, "12 Bases • 8 Air Wings", "alliance"))
+            list.add(LeaderboardItem(3, "Solar Vanguard", "[SOL]", 84000, "8 Bases • 6 Air Wings", "alliance"))
+            list.add(LeaderboardItem(4, "Aegis Coalition", "[AEG]", 62000, "6 Bases • 4 Air Wings", "alliance"))
+            list.add(LeaderboardItem(5, "General Vane", "[NEX]", 48500, "Citadel Citadel L3", "player"))
+        }
+        return list
+    }
+}

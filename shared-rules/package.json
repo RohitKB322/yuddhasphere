@@ -1,0 +1,15 @@
+{
+  "name": "@yuddhasphere/shared-rules",
+  "version": "0.1.0",
+  "description": "Pure game logic, formulas, catalogs and protocol schemas for YuddhaSphere",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.4.0"
+  }
+}

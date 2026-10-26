@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">YuddhaSphere</string>
+    <string name="hud_money_prefix">$</string>
+    <string name="hud_income_prefix">+$</string>
+    <string name="hud_income_suffix">/hr</string>
+    <string name="hud_hp_default">1000/1000</string>
+    <string name="nav_build">Build</string>
+    <string name="nav_military">Military</string>
+    <string name="nav_alliance">Alliance</string>
+    <string name="nav_reports">Reports</string>
+    <string name="nav_menu">Menu</string>
+</resources>

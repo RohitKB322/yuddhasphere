@@ -1,0 +1,807 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>YuddhaSphere Tactical Map</title>
+  <link rel="stylesheet" href="leaflet.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #070B14;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #070B14;
+    }
+    .leaflet-control-attribution, .leaflet-control-zoom {
+      display: none !important;
+    }
+
+    /* Tactical Shader Filter for 100% Free OpenStreetMap */
+    .leaflet-tile {
+      filter: brightness(0.7) invert(1) contrast(1.7) hue-rotate(205deg) saturate(0.35) brightness(0.8);
+      transition: opacity 0.2s;
+    }
+
+    /* Commander Avatar Map Marker */
+    .player-avatar-marker {
+      position: relative;
+      width: 44px;
+      height: 52px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+    }
+    .player-avatar-badge {
+      width: 36px;
+      height: 36px;
+      background: rgba(10, 16, 28, 0.95);
+      border: 2px solid #00E5FF;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(0, 229, 255, 0.8), 0 0 28px rgba(0, 229, 255, 0.4);
+      position: relative;
+      z-index: 2;
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .player-avatar-badge:hover, .player-avatar-badge:active {
+      transform: scale(1.15);
+      border-color: #FFD600;
+    }
+    .player-pulse-ring {
+      position: absolute;
+      top: 2px;
+      left: 4px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid #00E5FF;
+      animation: pulseAnim 2.2s infinite ease-out;
+      opacity: 0.8;
+      z-index: 1;
+    }
+    @keyframes pulseAnim {
+      0% { transform: scale(0.6); opacity: 0.9; }
+      100% { transform: scale(2.4); opacity: 0; }
+    }
+    .player-callsign-pill {
+      margin-top: 2px;
+      background: rgba(7, 11, 20, 0.9);
+      border: 1px solid rgba(0, 229, 255, 0.6);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 8.5px;
+      font-weight: 900;
+      color: #00E5FF;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px #000;
+      z-index: 3;
+    }
+
+    /* Structure Map Marker */
+    .structure-marker-icon {
+      background: rgba(10, 16, 28, 0.94);
+      border: 2px solid #00E5FF;
+      border-radius: 50%;
+      width: 42px;
+      height: 42px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 229, 255, 0.5);
+      transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      cursor: pointer;
+    }
+    .structure-marker-icon.selected {
+      transform: scale(1.28);
+      border-color: #FFD600;
+      box-shadow: 0 0 24px #FFD600, 0 0 40px rgba(255, 214, 0, 0.7);
+    }
+    .marker-symbol {
+      font-size: 16px;
+      font-weight: 900;
+      color: #FFFFFF;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+      line-height: 1;
+    }
+    .marker-level {
+      font-size: 9px;
+      font-weight: bold;
+      color: #00E5FF;
+      letter-spacing: 0.5px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+
+    /* Supersonic Fighter Jet Marker with Delta Wing SVG & Heading */
+    .jet-marker-wrapper {
+      width: 44px;
+      height: 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.25s ease-out;
+    }
+    .jet-marker-wrapper.selected svg {
+      filter: drop-shadow(0 0 12px #00E5FF) drop-shadow(0 0 20px #00E5FF);
+    }
+    .jet-callsign-tag {
+      position: absolute;
+      bottom: -11px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 16, 28, 0.9);
+      border: 1px solid rgba(255, 159, 10, 0.8);
+      border-radius: 3px;
+      padding: 0px 4px;
+      font-size: 8px;
+      font-weight: bold;
+      color: #FF9F0A;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* Center Crosshair */
+    #center-crosshair {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 1000;
+    }
+    .crosshair-reticle {
+      width: 44px;
+      height: 44px;
+      border: 2px dashed rgba(0, 229, 255, 0.8);
+      border-radius: 50%;
+      position: relative;
+    }
+    .crosshair-center {
+      width: 6px;
+      height: 6px;
+      background: #00E5FF;
+      border-radius: 50%;
+      position: absolute;
+      top: 17px;
+      left: 17px;
+      box-shadow: 0 0 8px #00E5FF;
+    }
+
+    .tactical-grid {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
+    }
+  </style>
+</head>
+<body class="tactical-grid">
+  <div id="map"></div>
+  <div id="center-crosshair">
+    <div class="crosshair-reticle">
+      <div class="crosshair-center"></div>
+    </div>
+  </div>
+
+  <script src="leaflet.js"></script>
+  <script>
+    let map = null;
+    let playerMarker = null;
+    let accuracyCircle = null;
+    let currentPosition = { lat: 19.0760, lng: 72.8777 };
+    let commanderCallsign = "Commander";
+
+    let structuresCache = [];
+    let structureMarkers = {};
+    let selectedRadiusCircle = null; // ONLY one circle shown when clicked!
+
+    let unitsCache = [];
+    let unitMarkers = {};
+    let unitFlightPaths = {};
+    let selectedJetId = null;
+    let radarArcPolygon = null;
+
+    let placementCircle = null;
+    let isPlacementActive = false;
+    let placementTarget = null;
+    let selectedStructureId = null;
+
+    let isTargetingSortie = false;
+    let targetingMode = null; // 'strike' or 'patrol'
+
+    const GLYPHS = {
+      village: '⌂',
+      town: '🏢',
+      city: '🏛',
+      metropolis: '⚡',
+      town_hall: '👑',
+      barracks: '⚔',
+      airbase: '✈',
+      port: '⚓',
+      mine: '⛏',
+      sam: '🚀',
+      radar: '📡',
+      wall: '🛡'
+    };
+
+    function initMap() {
+      try {
+        map = L.map('map', {
+          zoomControl: false,
+          attributionControl: false,
+          fadeAnimation: true,
+          markerZoomAnimation: true,
+          maxZoom: 19,
+          minZoom: 3
+        }).setView([currentPosition.lat, currentPosition.lng], 16);
+
+        // 100% Free OpenStreetMap Tiles
+        const osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          subdomains: ['a', 'b', 'c']
+        });
+
+        osmLayer.on('tileerror', function(error, tile) {
+          const coords = error.coords;
+          if (coords) {
+            tile.src = `https://a.tile.openstreetmap.fr/hot/${coords.z}/${coords.x}/${coords.y}.png`;
+          }
+        });
+
+        osmLayer.addTo(map);
+
+        // Map Click handling
+        map.on('click', function(e) {
+          if (isTargetingSortie) {
+            isTargetingSortie = false;
+            document.getElementById('center-crosshair').style.display = 'none';
+            if (window.AndroidBridge && window.AndroidBridge.onSortieTargetPicked) {
+              window.AndroidBridge.onSortieTargetPicked(e.latlng.lat, e.latlng.lng, "");
+            }
+          } else if (isPlacementActive) {
+            setPlacementTarget(e.latlng.lat, e.latlng.lng);
+          } else {
+            // Deselect any selected building or jet
+            deselectAll();
+            if (window.AndroidBridge && window.AndroidBridge.onMapClicked) {
+              window.AndroidBridge.onMapClicked();
+            }
+          }
+        });
+
+        map.on('move', function() {
+          if (isPlacementActive && !placementTarget) {
+            const center = map.getCenter();
+            if (placementCircle) {
+              placementCircle.setLatLng(center);
+            }
+          }
+        });
+
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+          window.AndroidBridge.onMapReady();
+        }
+      } catch (err) {
+        console.error("Leaflet initMap error:", err);
+        if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
+          window.AndroidBridge.onMapReady();
+        }
+      }
+    }
+
+    // Update Player Location & Commander Avatar
+    window.updatePlayerLocation = function(lat, lng, accuracy, autoRecenter, callsign) {
+      currentPosition = { lat, lng };
+      if (callsign) commanderCallsign = callsign;
+      if (!map) return;
+
+      const avatarHtml = `
+        <div class="player-avatar-marker">
+          <div class="player-pulse-ring"></div>
+          <div class="player-avatar-badge">
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <path fill="#00E5FF" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+            </svg>
+          </div>
+          <div class="player-callsign-pill">${commanderCallsign}</div>
+        </div>
+      `;
+
+      const avatarIcon = L.divIcon({
+        className: '',
+        html: avatarHtml,
+        iconSize: [44, 52],
+        iconAnchor: [22, 20]
+      });
+
+      if (!playerMarker) {
+        playerMarker = L.marker([lat, lng], { icon: avatarIcon, zIndexOffset: 1100 }).addTo(map);
+        playerMarker.on('click', function(e) {
+          L.DomEvent.stopPropagation(e);
+          if (window.AndroidBridge && window.AndroidBridge.onPlayerAvatarClicked) {
+            window.AndroidBridge.onPlayerAvatarClicked();
+          }
+        });
+      } else {
+        playerMarker.setLatLng([lat, lng]);
+        playerMarker.setIcon(avatarIcon);
+      }
+
+      // Accuracy circle
+      if (accuracy && accuracy > 0) {
+        if (!accuracyCircle) {
+          accuracyCircle = L.circle([lat, lng], {
+            radius: Math.min(accuracy, 120),
+            color: '#00E5FF',
+            weight: 1,
+            opacity: 0.35,
+            fillColor: '#00E5FF',
+            fillOpacity: 0.08,
+            interactive: false
+          }).addTo(map);
+        } else {
+          accuracyCircle.setLatLng([lat, lng]);
+          accuracyCircle.setRadius(Math.min(accuracy, 120));
+        }
+      }
+
+      if (autoRecenter) {
+        map.panTo([lat, lng], { animate: true, duration: 0.5 });
+      }
+    };
+
+    // Render world structures WITHOUT rendering background radius circles
+    window.renderWorldState = function(structuresJsonString) {
+      if (!map) return;
+      try {
+        const structures = typeof structuresJsonString === 'string'
+          ? JSON.parse(structuresJsonString)
+          : structuresJsonString;
+
+        structuresCache = structures;
+        const currentIds = new Set(structures.map(s => s.id));
+
+        // Remove stale structures
+        Object.keys(structureMarkers).forEach(id => {
+          if (!currentIds.has(id)) {
+            map.removeLayer(structureMarkers[id]);
+            delete structureMarkers[id];
+          }
+        });
+
+        // Add or update markers ONLY (no radius clutter!)
+        structures.forEach(s => {
+          const lat = s.position.lat;
+          const lng = s.position.lng;
+          const glyph = GLYPHS[s.type] || '⌂';
+          const teamColor = s.teamColor || '#00E5FF';
+          const isSelected = selectedStructureId === s.id;
+
+          const markerHtml = `
+            <div class="structure-marker-icon ${isSelected ? 'selected' : ''}" style="border-color: ${isSelected ? '#FFD600' : teamColor};">
+              <span class="marker-symbol">${glyph}</span>
+              <span class="marker-level" style="color: ${teamColor};">L${s.level || 1}</span>
+            </div>
+          `;
+          const customIcon = L.divIcon({
+            className: '',
+            html: markerHtml,
+            iconSize: [42, 42],
+            iconAnchor: [21, 21]
+          });
+
+          if (!structureMarkers[s.id]) {
+            const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
+            marker.on('click', function(e) {
+              L.DomEvent.stopPropagation(e);
+              if (isTargetingSortie) {
+                isTargetingSortie = false;
+                document.getElementById('center-crosshair').style.display = 'none';
+                if (window.AndroidBridge && window.AndroidBridge.onSortieTargetPicked) {
+                  window.AndroidBridge.onSortieTargetPicked(lat, lng, s.id);
+                }
+              } else {
+                selectStructure(s.id);
+                if (window.AndroidBridge && window.AndroidBridge.onBuildingClicked) {
+                  window.AndroidBridge.onBuildingClicked(s.id);
+                }
+              }
+            });
+            structureMarkers[s.id] = marker;
+          } else {
+            structureMarkers[s.id].setLatLng([lat, lng]);
+            structureMarkers[s.id].setIcon(customIcon);
+          }
+        });
+
+        if (selectedStructureId) {
+          showRadiusForStructure(selectedStructureId);
+        }
+      } catch (e) {
+        console.error("renderWorldState error:", e);
+      }
+    };
+
+    // Shows radius ONLY for the selected building!
+    function showRadiusForStructure(id) {
+      const s = structuresCache.find(item => item.id === id);
+      if (!s || !map) return;
+
+      if (selectedRadiusCircle) {
+        map.removeLayer(selectedRadiusCircle);
+        selectedRadiusCircle = null;
+      }
+
+      let radiusColor = '#00E5FF';
+      let fillOpacity = 0.12;
+      let dashArray = null;
+
+      if (s.radiusType === 'defense') {
+        radiusColor = '#FF9500';
+        fillOpacity = 0.15;
+        dashArray = '6, 6';
+      } else if (s.radiusType === 'vision') {
+        radiusColor = '#AF52DE';
+        fillOpacity = 0.10;
+      }
+
+      selectedRadiusCircle = L.circle([s.position.lat, s.position.lng], {
+        radius: s.radiusMeters || 150,
+        color: radiusColor,
+        dashArray: dashArray,
+        weight: 2,
+        opacity: 0.8,
+        fillColor: radiusColor,
+        fillOpacity: fillOpacity,
+        interactive: false
+      }).addTo(map);
+    }
+
+    function selectStructure(id) {
+      deselectAll();
+      selectedStructureId = id;
+      showRadiusForStructure(id);
+
+      const marker = structureMarkers[id];
+      if (marker && map) {
+        const latlng = marker.getLatLng();
+        map.panTo([latlng.lat - 0.0012, latlng.lng], { animate: true, duration: 0.4 });
+      }
+    }
+
+    window.deselectAll = function() {
+      selectedStructureId = null;
+      selectedJetId = null;
+      if (selectedRadiusCircle && map) {
+        map.removeLayer(selectedRadiusCircle);
+        selectedRadiusCircle = null;
+      }
+      if (radarArcPolygon && map) {
+        map.removeLayer(radarArcPolygon);
+        radarArcPolygon = null;
+      }
+      document.querySelectorAll('.structure-marker-icon.selected').forEach(el => {
+        el.classList.remove('selected');
+      });
+    };
+
+    // Calculate forward sector polygon for jet radar arc
+    function computeRadarSectorCoords(centerLat, centerLng, headingDeg, coneAngleDeg, rangeMeters) {
+      const coords = [[centerLat, centerLng]];
+      const halfAngle = (coneAngleDeg || 60) / 2;
+      const startAngle = headingDeg - halfAngle;
+      const endAngle = headingDeg + halfAngle;
+      const steps = 12;
+      const earthRadius = 6378137;
+      const d = (rangeMeters || 1500) / earthRadius;
+      const centerLatRad = centerLat * Math.PI / 180;
+      const centerLngRad = centerLng * Math.PI / 180;
+
+      for (let i = 0; i <= steps; i++) {
+        const bDeg = startAngle + (endAngle - startAngle) * (i / steps);
+        const bRad = bDeg * Math.PI / 180;
+        const ptLat = Math.asin(Math.sin(centerLatRad) * Math.cos(d) + Math.cos(centerLatRad) * Math.sin(d) * Math.cos(bRad));
+        const ptLng = centerLngRad + Math.atan2(Math.sin(bRad) * Math.sin(d) * Math.cos(centerLatRad), Math.cos(d) - Math.sin(centerLatRad) * Math.sin(ptLat));
+        coords.push([ptLat * 180 / Math.PI, ptLng * 180 / Math.PI]);
+      }
+      coords.push([centerLat, centerLng]);
+      return coords;
+    }
+
+    // Render active air sorties with Top-Down Fighter Jet Icon & Heading Rotation
+    window.renderUnits = function(unitsJsonString) {
+      if (!map) return;
+      try {
+        const units = typeof unitsJsonString === 'string'
+          ? JSON.parse(unitsJsonString)
+          : unitsJsonString;
+
+        unitsCache = units;
+        const activeUnitIds = new Set(units.map(u => u.id));
+
+        // Remove old markers and flight paths
+        Object.keys(unitMarkers).forEach(id => {
+          if (!activeUnitIds.has(id)) {
+            map.removeLayer(unitMarkers[id]);
+            delete unitMarkers[id];
+            if (unitFlightPaths[id]) {
+              map.removeLayer(unitFlightPaths[id]);
+              delete unitFlightPaths[id];
+            }
+          }
+        });
+
+        units.forEach(u => {
+          const lat = u.position.lat;
+          const lng = u.position.lng;
+          const isSelected = selectedJetId === u.id;
+          const heading = u.heading || 0;
+          const strokeColor = u.teamColor || '#FF9F0A';
+
+          // Delta Wing Supersonic Fighter Jet Icon
+          const jetHtml = `
+            <div class="jet-marker-wrapper ${isSelected ? 'selected' : ''}" style="transform: rotate(${heading}deg);">
+              <svg viewBox="0 0 40 40" width="40" height="40">
+                <!-- Delta Wing Fighter Jet -->
+                <path fill="#0E1726" stroke="${strokeColor}" stroke-width="2.2" stroke-linejoin="round" d="M20 3 L23 13 L36 22 L36 26 L23 23 L23 32 L26 35 L26 37 L20 35 L14 37 L14 35 L17 32 L17 23 L4 26 L4 22 L17 13 Z"/>
+                <!-- Afterburner Flame / Engine Glow -->
+                <circle cx="20" cy="35" r="2.5" fill="#00E5FF"/>
+              </svg>
+              <div class="jet-callsign-tag" style="transform: translateX(-50%) rotate(-${heading}deg);">${u.name}</div>
+            </div>
+          `;
+
+          const unitIcon = L.divIcon({
+            className: '',
+            html: jetHtml,
+            iconSize: [44, 44],
+            iconAnchor: [22, 22]
+          });
+
+          if (!unitMarkers[u.id]) {
+            const marker = L.marker([lat, lng], { icon: unitIcon, zIndexOffset: 950 }).addTo(map);
+            marker.on('click', function(e) {
+              L.DomEvent.stopPropagation(e);
+              selectedJetId = u.id;
+              renderRadarCone(u);
+              if (window.AndroidBridge && window.AndroidBridge.onJetClicked) {
+                window.AndroidBridge.onJetClicked(u.id);
+              }
+            });
+            unitMarkers[u.id] = marker;
+          } else {
+            unitMarkers[u.id].setLatLng([lat, lng]);
+            unitMarkers[u.id].setIcon(unitIcon);
+          }
+
+          // If currently selected, live-update its radar cone!
+          if (isSelected) {
+            renderRadarCone(u);
+          }
+
+          // Dotted flight trajectory line
+          if (u.targetPosition) {
+            const pathCoords = [
+              [u.position.lat, u.position.lng],
+              [u.targetPosition.lat, u.targetPosition.lng]
+            ];
+            const pathColor = u.order === 'patrol' ? '#00E5FF' : '#FF9F0A';
+            if (!unitFlightPaths[u.id]) {
+              unitFlightPaths[u.id] = L.polyline(pathCoords, {
+                color: pathColor,
+                dashArray: '5, 8',
+                weight: 2,
+                opacity: 0.75
+              }).addTo(map);
+            } else {
+              unitFlightPaths[u.id].setLatLngs(pathCoords);
+              unitFlightPaths[u.id].setStyle({ color: pathColor });
+            }
+          }
+        });
+      } catch (err) {
+        console.error("renderUnits error:", err);
+      }
+    };
+
+    function renderRadarCone(u) {
+      if (!map) return;
+      const coneAngle = u.radarConeAngle || 60;
+      const heading = u.heading || 0;
+      const sectorCoords = computeRadarSectorCoords(u.position.lat, u.position.lng, heading, coneAngle, 1200);
+
+      if (!radarArcPolygon) {
+        radarArcPolygon = L.polygon(sectorCoords, {
+          color: '#00E5FF',
+          weight: 1.5,
+          dashArray: '4, 4',
+          fillColor: '#00E5FF',
+          fillOpacity: 0.14,
+          interactive: false
+        }).addTo(map);
+      } else {
+        radarArcPolygon.setLatLngs(sectorCoords);
+      }
+    }
+
+    // High-Speed Animated Missile Streak & Detonation Blast
+    window.animateMissileLaunch = function(startLat, startLng, endLat, endLng, missileType) {
+      if (!map) return;
+
+      const missileColor = missileType === 'sam_interceptor' ? '#30D158' : '#FF9F0A';
+      const durationMs = 1200;
+      const startTime = performance.now();
+
+      // Missile Icon
+      const missileHtml = `
+        <div style="width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
+          <div style="width: 8px; height: 8px; background: ${missileColor}; border-radius: 50%; box-shadow: 0 0 10px ${missileColor}, 0 0 18px #FFF;"></div>
+        </div>
+      `;
+      const missileIcon = L.divIcon({
+        className: '',
+        html: missileHtml,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      });
+
+      const missileMarker = L.marker([startLat, startLng], { icon: missileIcon, zIndexOffset: 2000 }).addTo(map);
+      const trailLine = L.polyline([[startLat, startLng], [startLat, startLng]], {
+        color: missileColor,
+        weight: 2.5,
+        opacity: 0.85
+      }).addTo(map);
+
+      function step(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / durationMs, 1.0);
+
+        const curLat = startLat + (endLat - startLat) * progress;
+        const curLng = startLng + (endLng - startLng) * progress;
+
+        missileMarker.setLatLng([curLat, curLng]);
+        trailLine.setLatLngs([
+          [startLat + (endLat - startLat) * Math.max(0, progress - 0.3), startLng + (endLng - startLng) * Math.max(0, progress - 0.3)],
+          [curLat, curLng]
+        ]);
+
+        if (progress < 1.0) {
+          requestAnimationFrame(step);
+        } else {
+          // Reached target: remove missile & line, trigger detonation shockwave
+          map.removeLayer(missileMarker);
+          map.removeLayer(trailLine);
+
+          const blastCircle = L.circle([endLat, endLng], {
+            radius: 8,
+            color: '#FFD600',
+            weight: 2,
+            fillColor: '#FF453A',
+            fillOpacity: 0.6
+          }).addTo(map);
+
+          let blastStep = 0;
+          const blastInterval = setInterval(() => {
+            blastStep++;
+            blastCircle.setRadius(8 + blastStep * 14);
+            blastCircle.setStyle({
+              opacity: Math.max(0, 0.8 - blastStep * 0.16),
+              fillOpacity: Math.max(0, 0.6 - blastStep * 0.12)
+            });
+            if (blastStep >= 5) {
+              clearInterval(blastInterval);
+              map.removeLayer(blastCircle);
+            }
+          }, 40);
+        }
+      }
+
+      requestAnimationFrame(step);
+    };
+
+    window.startSortieTargeting = function() {
+      isTargetingSortie = true;
+      document.getElementById('center-crosshair').style.display = 'block';
+    };
+
+    window.cancelSortieTargeting = function() {
+      isTargetingSortie = false;
+      document.getElementById('center-crosshair').style.display = 'none';
+    };
+
+    window.recenterMap = function() {
+      if (map && currentPosition) {
+        map.flyTo([currentPosition.lat, currentPosition.lng], 16.5, { duration: 0.8 });
+      }
+    };
+
+    // Placement Mode Functions
+    window.startPlacement = function(structureType, radiusMeters, radiusType) {
+      if (!map) return;
+      isPlacementActive = true;
+      placementTarget = null;
+      deselectAll();
+
+      const center = map.getCenter();
+      document.getElementById('center-crosshair').style.display = 'block';
+
+      if (placementCircle) {
+        map.removeLayer(placementCircle);
+      }
+
+      placementCircle = L.circle(center, {
+        radius: radiusMeters || 150,
+        color: '#30D158',
+        weight: 2,
+        dashArray: '8, 8',
+        fillColor: '#30D158',
+        fillOpacity: 0.18,
+        interactive: false
+      }).addTo(map);
+    };
+
+    function setPlacementTarget(lat, lng) {
+      placementTarget = { lat, lng };
+      if (placementCircle) {
+        placementCircle.setLatLng([lat, lng]);
+      }
+      document.getElementById('center-crosshair').style.display = 'none';
+    }
+
+    window.setPlacementToPlayerGps = function() {
+      if (currentPosition) {
+        setPlacementTarget(currentPosition.lat, currentPosition.lng);
+        if (map) {
+          map.panTo([currentPosition.lat, currentPosition.lng], { animate: true });
+        }
+      }
+    };
+
+    window.getPlacementCoordinates = function() {
+      if (placementTarget) {
+        return JSON.stringify(placementTarget);
+      }
+      if (map) {
+        const center = map.getCenter();
+        return JSON.stringify({ lat: center.lat, lng: center.lng });
+      }
+      return JSON.stringify(currentPosition);
+    };
+
+    window.cancelPlacement = function() {
+      isPlacementActive = false;
+      placementTarget = null;
+      document.getElementById('center-crosshair').style.display = 'none';
+      if (placementCircle && map) {
+        map.removeLayer(placementCircle);
+        placementCircle = null;
+      }
+    };
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>

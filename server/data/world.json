@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "lastTickTime": 1793018497967,
+  "players": {
+    "device_01": {
+      "id": "device_01",
+      "deviceId": "device_01",
+      "callsign": "Rohit",
+      "team": "blue",
+      "teamColor": "#00E5FF",
+      "position": {
+        "lat": 19.076,
+        "lng": 72.8777
+      },
+      "accuracy": 10,
+      "wealth": 10000,
+      "incomePerHour": 100,
+      "hp": 1000,
+      "maxHp": 1000,
+      "isOnline": true,
+      "lastActive": 1793017701290,
+      "bannedState": "none",
+      "allianceId": "all_mvp8gj5e"
+    }
+  },
+  "structures": {
+    "str_mvp8gri9_wqrl": {
+      "id": "str_mvp8gri9_wqrl",
+      "ownerId": "device_01",
+      "ownerCallsign": "Rohit",
+      "team": "blue",
+      "teamColor": "#00E5FF",
+      "type": "village",
+      "name": "VILLAGE",
+      "level": 1,
+      "position": {
+        "lat": 18.99584211440998,
+        "lng": 72.82626138719938
+      },
+      "hp": 200,
+      "maxHp": 200,
+      "radiusMeters": 250,
+      "radiusType": "influence",
+      "online": true,
+      "createdAt": 1793017736001,
+      "slots": {
+        "storedUnits": [],
+        "queue": []
+      }
+    }
+  },
+  "units": {},
+  "projectiles": {},
+  "loot": {}
+}

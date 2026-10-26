@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary_neon">#00E5FF</color>
+    <color name="primary_neon_glow">#4D00E5FF</color>
+    <color name="accent_green">#30D158</color>
+    <color name="accent_orange">#FF9F0A</color>
+    <color name="accent_red">#FF453A</color>
+    <color name="accent_gold">#FFD600</color>
+
+    <color name="bg_tactical_dark">#080C14</color>
+    <color name="bg_glass_hud">#CC0A101D</color>
+    <color name="bg_glass_panel">#F20D1526</color>
+    <color name="border_glass">#2E425E</color>
+
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#8E9FB8</color>
+    <color name="text_muted">#576880</color>
+
+    <!-- Base Android theme colors -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

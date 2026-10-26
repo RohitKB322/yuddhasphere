@@ -1,0 +1,152 @@
+{
+  "game": {
+    "title": "YuddhaSphere",
+    "version": "0.1.0",
+    "tickRateMs": 1000,
+    "incomeIntervalSeconds": 3600,
+    "startingWealth": 10000,
+    "startingHp": 1000,
+    "structureSeparationMeters": 30,
+    "maxPlayerProximityMeters": 600,
+    "resaleRefundRate": 0.5,
+    "maxSpeedThresholdMps": 35.0,
+    "worldBackupIntervalMinutes": 60,
+    "worldSaveIntervalSeconds": 30
+  },
+  "settlementChain": {
+    "village": {
+      "name": "Village",
+      "level": 1,
+      "radiusMeters": 150,
+      "incomePerHour": 50,
+      "populationCap": 100,
+      "hp": 100,
+      "buildCost": 350,
+      "upgradeCost": 800,
+      "upgradeDurationSeconds": 45,
+      "nextLevel": "town"
+    },
+    "town": {
+      "name": "Town",
+      "level": 2,
+      "radiusMeters": 250,
+      "incomePerHour": 150,
+      "populationCap": 400,
+      "hp": 200,
+      "buildCost": 800,
+      "upgradeCost": 2500,
+      "upgradeDurationSeconds": 120,
+      "nextLevel": "city"
+    },
+    "city": {
+      "name": "City",
+      "level": 3,
+      "radiusMeters": 400,
+      "incomePerHour": 400,
+      "populationCap": 1500,
+      "hp": 400,
+      "buildCost": 2500,
+      "upgradeCost": 8000,
+      "upgradeDurationSeconds": 300,
+      "nextLevel": "metropolis"
+    },
+    "metropolis": {
+      "name": "Metropolis",
+      "level": 4,
+      "radiusMeters": 600,
+      "incomePerHour": 1000,
+      "populationCap": 5000,
+      "hp": 800,
+      "buildCost": 8000,
+      "upgradeCost": 0,
+      "upgradeDurationSeconds": 0,
+      "nextLevel": null
+    }
+  },
+  "otherBuildings": {
+    "town_hall": {
+      "name": "Town Hall (HQ)",
+      "category": "headquarters",
+      "radiusMeters": 500,
+      "radiusType": "territory",
+      "incomePerHour": 100,
+      "hp": 1000,
+      "buildCost": 0,
+      "description": "Claims land territory; required for constructing bases."
+    },
+    "barracks": {
+      "name": "Barracks",
+      "category": "military",
+      "radiusMeters": 150,
+      "radiusType": "rally",
+      "incomePerHour": 0,
+      "hp": 300,
+      "buildCost": 600,
+      "description": "Trains infantry and light combat vehicles."
+    },
+    "airbase": {
+      "name": "Airbase",
+      "category": "military",
+      "radiusMeters": 300,
+      "radiusType": "operations",
+      "incomePerHour": 0,
+      "hp": 500,
+      "buildCost": 1200,
+      "baseJetSlots": 2,
+      "slotsPerLevel": 2,
+      "description": "Stores and launches strike aircraft and air patrols."
+    },
+    "port": {
+      "name": "Naval Port",
+      "category": "military",
+      "radiusMeters": 250,
+      "radiusType": "operations",
+      "incomePerHour": 0,
+      "hp": 400,
+      "buildCost": 1000,
+      "description": "Constructs and repairs naval surface vessels."
+    },
+    "mine": {
+      "name": "Resource Mine",
+      "category": "resource",
+      "radiusMeters": 100,
+      "radiusType": "gather",
+      "incomePerHour": 180,
+      "hp": 250,
+      "buildCost": 500,
+      "description": "Extracts high-yield materials for enhanced income."
+    },
+    "sam": {
+      "name": "SAM Defence Site",
+      "category": "defense",
+      "radiusMeters": 400,
+      "radiusType": "defense",
+      "incomePerHour": 0,
+      "hp": 350,
+      "buildCost": 750,
+      "baseInterceptorSlots": 6,
+      "slotsPerLevel": 6,
+      "description": "Surface-to-air missile site to shoot down incoming aerial strikes."
+    },
+    "radar": {
+      "name": "Radar / Watchtower",
+      "category": "recon",
+      "radiusMeters": 800,
+      "radiusType": "vision",
+      "incomePerHour": 0,
+      "hp": 200,
+      "buildCost": 450,
+      "description": "Scans airspace and ground for enemy movements in fog of war."
+    },
+    "wall": {
+      "name": "Perimeter Wall / Bunker",
+      "category": "defense",
+      "radiusMeters": 50,
+      "radiusType": "fortify",
+      "incomePerHour": 0,
+      "hp": 600,
+      "buildCost": 200,
+      "description": "Fortifies nearby structures and increases regional HP."
+    }
+  }
+}

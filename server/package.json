@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@yuddhasphere/shared-rules": "file:../shared-rules",
+    "mongodb": "^7.7.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

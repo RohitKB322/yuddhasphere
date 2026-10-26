@@ -3,16 +3,25 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { World } from './world';
 import { PersistenceManager } from './persistence';
 import { GameLoop } from './gameloop';
+import { dbManager } from './db';
 import { ClientCommand, ServerMessage, Player, Structure } from '@yuddhasphere/shared-rules';
 
 const PORT = parseInt(process.env.PORT || '8080', 10);
 
 const world = new World();
 const persistence = new PersistenceManager();
-persistence.loadWorld(world);
-
 const gameLoop = new GameLoop(world, persistence);
-gameLoop.start();
+
+async function bootstrap() {
+  const dbConnected = await dbManager.connect();
+  if (dbConnected) {
+    await dbManager.loadWorldState(world);
+  } else {
+    persistence.loadWorld(world);
+  }
+  gameLoop.start();
+}
+bootstrap();
 
 const server = http.createServer((req, res) => {
   res.writeHead(200, {
@@ -22,9 +31,10 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({
     status: 'ONLINE',
     game: 'YuddhaSphere Authoritative RTS Server',
-    version: '0.5.0',
+    version: '0.5.2',
     port: PORT,
     playersOnline: clients.size,
+    dbConnected: (dbManager as any).isConnected || false,
     serverTime: Date.now()
   }, null, 2));
 });
@@ -94,6 +104,7 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
         player.lastActive = Date.now();
       }
 
+      dbManager.savePlayer(player);
       clients.set(ws, player.id);
 
       // Send InitSync with world snapshot and alliance
@@ -147,6 +158,7 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       };
 
       world.addStructure(newStructure);
+      dbManager.saveStructure(newStructure);
       world.reports.addReport('economy', `Construction Completed`, `Constructed ${newStructure.name} at coordinates.`, 'info');
 
       // Broadcast state difference to all connected players
@@ -154,6 +166,31 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
         type: 'StateDiff',
         serverTime: Date.now(),
         updatedStructures: [newStructure]
+      });
+      break;
+    }
+
+    case 'UpgradeStructure': {
+      const s = world.state.structures[command.structureId];
+      if (s) {
+        s.level += 1;
+        dbManager.saveStructure(s);
+        broadcast({
+          type: 'StateDiff',
+          serverTime: Date.now(),
+          updatedStructures: [s]
+        });
+      }
+      break;
+    }
+
+    case 'SellStructure': {
+      world.removeStructure(command.structureId);
+      dbManager.removeStructure(command.structureId);
+      broadcast({
+        type: 'StateDiff',
+        serverTime: Date.now(),
+        removedStructureIds: [command.structureId]
       });
       break;
     }
@@ -171,6 +208,8 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
           command.colorHex || '#00E5FF'
         );
         player.allianceId = alliance.id;
+        dbManager.saveAlliance(alliance);
+        dbManager.savePlayer(player);
         world.reports.addReport('diplomacy', 'Alliance Founded', `Commander ${player.callsign} established alliance ${alliance.name} ${alliance.tag}.`, 'info');
 
         ws.send(JSON.stringify({
@@ -191,6 +230,8 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
         if (success) {
           player.allianceId = command.allianceId;
           const all = world.alliances.getAlliance(command.allianceId);
+          if (all) dbManager.saveAlliance(all);
+          dbManager.savePlayer(player);
           world.reports.addReport('diplomacy', 'Alliance Member Joined', `${player.callsign} enlisted into ${all?.name} ${all?.tag}.`, 'info');
           ws.send(JSON.stringify({
             type: 'AllianceUpdate',
@@ -207,6 +248,7 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       const player = playerId ? world.getPlayer(playerId) : undefined;
       if (player && player.allianceId) {
         const treaty = world.alliances.setTreaty(player.allianceId, command.targetAllianceId, command.status);
+        dbManager.saveTreaty(treaty);
         world.reports.addReport('diplomacy', 'Diplomatic Treaty Ratified', `Status between factions updated to ${command.status.toUpperCase()}.`, command.status === 'war' ? 'danger' : 'info');
         broadcast({
           type: 'AllianceUpdate',
@@ -221,8 +263,13 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       const playerId = clients.get(ws);
       const player = playerId ? world.getPlayer(playerId) : undefined;
       if (player && player.allianceId) {
-        world.alliances.leaveAlliance(player.allianceId, player.id);
+        const oldAllId = player.allianceId;
+        world.alliances.leaveAlliance(oldAllId, player.id);
         player.allianceId = undefined;
+        const all = world.alliances.getAlliance(oldAllId);
+        if (all) dbManager.saveAlliance(all);
+        else dbManager.removeAlliance(oldAllId);
+        dbManager.savePlayer(player);
         ws.send(JSON.stringify({
           type: 'AllianceUpdate',
           alliance: null,
@@ -237,9 +284,11 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       const player = playerId ? world.getPlayer(playerId) : undefined;
       if (player && player.allianceId) {
         world.alliances.setTaxRate(player.allianceId, command.taxPercent);
+        const all = world.alliances.getAlliance(player.allianceId);
+        if (all) dbManager.saveAlliance(all);
         broadcast({
           type: 'AllianceUpdate',
-          alliance: world.alliances.getAlliance(player.allianceId) || null,
+          alliance: all || null,
           treaties: world.alliances.getTreaties()
         });
       }
@@ -251,9 +300,11 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       const player = playerId ? world.getPlayer(playerId) : undefined;
       if (player && player.allianceId) {
         world.alliances.setMemberRole(player.allianceId, command.targetPlayerId, command.role);
+        const all = world.alliances.getAlliance(player.allianceId);
+        if (all) dbManager.saveAlliance(all);
         broadcast({
           type: 'AllianceUpdate',
-          alliance: world.alliances.getAlliance(player.allianceId) || null,
+          alliance: all || null,
           treaties: world.alliances.getTreaties()
         });
       }

@@ -1,5 +1,6 @@
 import { World } from './world';
 import { PersistenceManager } from './persistence';
+import { dbManager } from './db';
 
 export class GameLoop {
   private world: World;
@@ -37,9 +38,10 @@ export class GameLoop {
       }
     }
 
-    // 2. Periodic atomic persistence save every 30 seconds
+    // 2. Periodic persistence save every 30 seconds (Local File + MongoDB)
     if (this.tickCount % 30 === 0) {
       this.persistence.saveWorld(this.world);
+      dbManager.saveFullWorld(this.world).catch(() => {});
     }
 
     // 3. Hourly timestamped backup (every 3600 seconds)

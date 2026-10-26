@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GameLoop = void 0;
+const db_1 = require("./db");
 class GameLoop {
     world;
     persistence;
@@ -32,9 +33,10 @@ class GameLoop {
                 // Level completion logic
             }
         }
-        // 2. Periodic atomic persistence save every 30 seconds
+        // 2. Periodic persistence save every 30 seconds (Local File + MongoDB)
         if (this.tickCount % 30 === 0) {
             this.persistence.saveWorld(this.world);
+            db_1.dbManager.saveFullWorld(this.world).catch(() => { });
         }
         // 3. Hourly timestamped backup (every 3600 seconds)
         if (this.tickCount % 3600 === 0) {

@@ -90,8 +90,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         loadSavedCommanderProfile()
         gameState.addListener(this)
 
-        val savedHost = prefs.getString("server_host", "10.0.2.2") ?: "10.0.2.2"
-        val savedPort = prefs.getString("server_port", "8080") ?: "8080"
+        val savedHost = prefs.getString("server_host", "yuddhasphere-server.onrender.com") ?: "yuddhasphere-server.onrender.com"
+        val savedPort = prefs.getString("server_port", "443") ?: "443"
         val initialUrl = buildServerUrl(savedHost, savedPort)
         gameClient = GameClient(initialUrl, this)
         gameClient.connect(initialUrl)
@@ -438,18 +438,20 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         }
 
         binding.btnPresetEmulator.setOnClickListener {
-            binding.etServerHost.setText("10.0.2.2")
-            binding.etServerPort.setText("8080")
+            binding.etServerHost.setText("yuddhasphere-server.onrender.com")
+            binding.etServerPort.setText("443")
+            Toast.makeText(this, "Set to Render Cloud Server", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnPresetLocalhost.setOnClickListener {
-            binding.etServerHost.setText("127.0.0.1")
+            binding.etServerHost.setText("192.168.137.1")
             binding.etServerPort.setText("8080")
+            Toast.makeText(this, "Set to Local Hotspot (192.168.137.1)", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnTestServerConnection.setOnClickListener {
-            val host = binding.etServerHost.text.toString().trim().ifEmpty { "10.0.2.2" }
-            val port = binding.etServerPort.text.toString().trim().ifEmpty { "8080" }
+            val host = binding.etServerHost.text.toString().trim().ifEmpty { "yuddhasphere-server.onrender.com" }
+            val port = binding.etServerPort.text.toString().trim().ifEmpty { "443" }
             val targetUrl = buildServerUrl(host, port)
             binding.tvServerStatusBadge.text = "Status: Connecting to $targetUrl..."
             binding.tvServerStatusBadge.setTextColor(Color.parseColor("#FF9F0A"))
@@ -461,8 +463,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnSaveCommanderProfile.setOnClickListener {
             val callsign = binding.etCommanderCallsign.text.toString().trim()
             val tag = binding.etCommanderTag.text.toString().trim()
-            val host = binding.etServerHost.text.toString().trim().ifEmpty { "10.0.2.2" }
-            val port = binding.etServerPort.text.toString().trim().ifEmpty { "8080" }
+            val host = binding.etServerHost.text.toString().trim().ifEmpty { "yuddhasphere-server.onrender.com" }
+            val port = binding.etServerPort.text.toString().trim().ifEmpty { "443" }
 
             if (callsign.isNotEmpty()) {
                 val finalTag = if (tag.isNotEmpty()) (if (tag.startsWith("[")) tag else "[$tag]") else ""
@@ -548,8 +550,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.cardCommanderSetup.visibility = View.VISIBLE
         binding.etCommanderCallsign.setText(gameState.player.callsign)
         binding.etCommanderTag.setText(gameState.player.allianceTag)
-        binding.etServerHost.setText(prefs.getString("server_host", "10.0.2.2"))
-        binding.etServerPort.setText(prefs.getString("server_port", "8080"))
+        binding.etServerHost.setText(prefs.getString("server_host", "yuddhasphere-server.onrender.com"))
+        binding.etServerPort.setText(prefs.getString("server_port", "443"))
     }
 
     private fun showCommanderProfileCard() {

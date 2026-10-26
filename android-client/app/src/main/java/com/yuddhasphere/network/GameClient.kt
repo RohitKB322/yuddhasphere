@@ -10,7 +10,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class GameClient(
-    private var serverUrl: String = "ws://10.0.2.2:8080",
+    private var serverUrl: String = "wss://yuddhasphere-server.onrender.com",
     private val listener: NetworkListener
 ) {
     interface NetworkListener {

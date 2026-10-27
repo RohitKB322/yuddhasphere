@@ -78,7 +78,8 @@ data class Structure(
     val createdAt: Long = System.currentTimeMillis(),
     var upgradeFinishedAt: Long? = null,
     val hangarJets: MutableList<HangarJetItem> = mutableListOf(),
-    var samMunitions: Int = 6
+    var samMunitions: Int = 6,
+    var missileMunitions: Int = 4
 ) {
     fun maxHangarSlots(): Int = when (level) {
         1 -> 3
@@ -87,6 +88,12 @@ data class Structure(
     }
 
     fun maxSamSlots(): Int = when (level) {
+        1 -> 4
+        2 -> 6
+        else -> 8
+    }
+
+    fun maxMissileSlots(): Int = when (level) {
         1 -> 4
         2 -> 6
         else -> 8
@@ -114,6 +121,7 @@ data class Structure(
             hangarJets.forEach { jetsArr.put(it.toJsonObject()) }
             put("hangarJets", jetsArr)
             put("samMunitions", samMunitions)
+            put("missileMunitions", missileMunitions)
         }
     }
 }
@@ -135,7 +143,7 @@ data class UnitItem(
     var order: String = "strike", // "strike", "patrol", "rtb"
     var speedMode: String = "subsonic", // "subsonic", "supersonic"
     var speedMps: Double = 220.0,
-    var rangeMeters: Int = 80000,
+    var rangeMeters: Int = 100000,
     var fuelPercent: Double = 100.0,
     var weaponsLoadout: String = "2x GBU-12 Laser-Guided • 2x AIM-120 AMRAAM",
     var damage: Int = 60,
@@ -143,7 +151,9 @@ data class UnitItem(
     var patrolAngle: Double = 0.0,
     var heading: Double = 0.0,
     var radarConeAngle: Int = 60, // 30, 60, or 90 degrees
-    var roe: String = "fire_at_will" // "aggressive", "fire_at_will", "peaceful"
+    var roe: String = "fire_at_will", // "aggressive", "fire_at_will", "peaceful"
+    var lockedTargetUnitId: String? = null,
+    var lockedTargetName: String? = null
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
@@ -169,6 +179,8 @@ data class UnitItem(
             put("heading", heading)
             put("radarConeAngle", radarConeAngle)
             put("roe", roe)
+            put("lockedTargetUnitId", lockedTargetUnitId ?: "")
+            put("lockedTargetName", lockedTargetName ?: "")
         }
     }
 }

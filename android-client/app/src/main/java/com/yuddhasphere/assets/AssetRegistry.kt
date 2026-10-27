@@ -21,6 +21,7 @@ object AssetRegistry {
         "building.airbase.l1" to R.drawable.ic_airbase,
         "building.port.l1" to R.drawable.ic_port,
         "building.sam.l1" to R.drawable.ic_sam,
+        "building.missile_silo.l1" to R.drawable.ic_sam,
         "building.radar.l1" to R.drawable.ic_radar,
         "building.wall.l1" to R.drawable.ic_wall,
 
@@ -36,6 +37,7 @@ object AssetRegistry {
         "interceptor.int_short" to R.drawable.ic_interceptor,
         "interceptor.int_medium" to R.drawable.ic_interceptor,
         "interceptor.int_long" to R.drawable.ic_interceptor,
+        "interceptor.cruise" to R.drawable.ic_interceptor,
 
         // UI & Avatar
         "ui.icon.money" to R.drawable.ic_currency,
@@ -57,7 +59,7 @@ object AssetRegistry {
         return when (type) {
             "village", "town", "city", "metropolis" -> R.drawable.ic_village
             "airbase" -> R.drawable.ic_airbase
-            "sam" -> R.drawable.ic_sam
+            "sam", "missile_silo" -> R.drawable.ic_sam
             "mine" -> R.drawable.ic_mine
             "barracks" -> R.drawable.ic_barracks
             "radar" -> R.drawable.ic_radar

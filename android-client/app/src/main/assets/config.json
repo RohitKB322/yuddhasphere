@@ -128,6 +128,18 @@
       "slotsPerLevel": 6,
       "description": "Surface-to-air missile theater umbrella (100km radar and interceptor envelope)."
     },
+    "missile_silo": {
+      "name": "Missile Launcher Facility",
+      "category": "strategic",
+      "radiusMeters": 200000,
+      "radiusType": "defense",
+      "incomePerHour": 0,
+      "hp": 700,
+      "buildCost": 1500,
+      "baseMissileSlots": 4,
+      "slotsPerLevel": 4,
+      "description": "Heavy strategic missile launch complex equipped with long-range 200km cruise missiles."
+    },
     "radar": {
       "name": "Radar / Watchtower",
       "category": "recon",

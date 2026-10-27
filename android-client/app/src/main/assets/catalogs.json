@@ -91,6 +91,16 @@
       "reloadSeconds": 60,
       "assetKey": "interceptor.int_long",
       "description": "Strategic theater air shield with high accuracy against incoming sorties (100 km BVR)."
+    },
+    {
+      "id": "msl_cruise_200",
+      "name": "BrahMos-ER Cruise Missile",
+      "rangeMeters": 200000,
+      "hitChance": 0.98,
+      "cost": 850,
+      "reloadSeconds": 45,
+      "assetKey": "interceptor.cruise",
+      "description": "Heavy strategic precision cruise missile with 200km theater range (Mach 0.85 flight)."
     }
   ],
   "groundUnits": [

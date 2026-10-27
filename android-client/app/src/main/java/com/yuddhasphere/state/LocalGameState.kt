@@ -151,11 +151,12 @@ class LocalGameState(private val context: Context) {
                         position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng")),
                         hp = sObj.optInt("hp", 100),
                         maxHp = sObj.optInt("maxHp", 100),
-                        radiusMeters = if (sObj.getString("type") == "sam") 100000.0 else sObj.optDouble("radiusMeters", 150.0),
+                        radiusMeters = if (sObj.getString("type") == "sam") 100000.0 else if (sObj.getString("type") == "missile_silo") 200000.0 else sObj.optDouble("radiusMeters", 150.0),
                         radiusType = sObj.optString("radiusType", "influence"),
                         online = sObj.optBoolean("online", true),
                         upgradeFinishedAt = if (sObj.has("upgradeFinishedAt") && !sObj.isNull("upgradeFinishedAt")) sObj.getLong("upgradeFinishedAt") else null,
-                        samMunitions = sObj.optInt("samMunitions", 6)
+                        samMunitions = sObj.optInt("samMunitions", 6),
+                        missileMunitions = sObj.optInt("missileMunitions", 4)
                     )
                     if (sObj.has("hangarJets")) {
                         val jArr = sObj.getJSONArray("hangarJets")
@@ -211,7 +212,9 @@ class LocalGameState(private val context: Context) {
                             patrolAngle = uObj.optDouble("patrolAngle", 0.0),
                             heading = uObj.optDouble("heading", 0.0),
                             radarConeAngle = uObj.optInt("radarConeAngle", 60),
-                            roe = uObj.optString("roe", "fire_at_will")
+                            roe = uObj.optString("roe", "fire_at_will"),
+                            lockedTargetUnitId = if (uObj.has("lockedTargetUnitId") && !uObj.isNull("lockedTargetUnitId")) uObj.getString("lockedTargetUnitId") else null,
+                            lockedTargetName = if (uObj.has("lockedTargetName") && !uObj.isNull("lockedTargetName")) uObj.getString("lockedTargetName") else null
                         )
                         activeUnits.add(unit)
                     }
@@ -455,19 +458,29 @@ class LocalGameState(private val context: Context) {
                 val distRemaining = GeoMath.calculateDistanceMeters(u.position, dest)
 
                 if (u.order == "patrol") {
-                    // Circular orbit patrol around waypoint
-                    if (distRemaining > 150.0) {
-                        // Fly to patrol center
+                    // Realistic 2.5km Tactical Circular Orbit Patrol with continuous 360-degree scan
+                    val orbitRadiusMeters = 2500.0
+                    val rLat = orbitRadiusMeters / 111139.0
+                    val rLng = orbitRadiusMeters / (111139.0 * cos(Math.toRadians(dest.lat)).coerceAtLeast(0.01))
+
+                    if (distRemaining > 2800.0) {
+                        // Fly smoothly to perimeter of the patrol orbit
                         advancePositionTowards(u, dest, distRemaining)
+                        u.patrolAngle = Math.atan2((u.position.lng - dest.lng) / rLng, (u.position.lat - dest.lat) / rLat)
                     } else {
-                        // Orbit around patrol point
+                        // Orbit continuously around patrol center
                         val prevLat = u.position.lat
                         val prevLng = u.position.lng
-                        u.patrolAngle += (if (u.speedMode == "supersonic") 0.25 else 0.12)
-                        val rDeg = 0.0018 // ~200 meters orbit
-                        val orbLat = dest.lat + rDeg * sin(u.patrolAngle)
-                        val orbLng = dest.lng + rDeg * cos(u.patrolAngle)
+
+                        // Angular step based on actual flight velocity: deltaTheta = (v * dt) / R
+                        val deltaTheta = (u.speedMps / orbitRadiusMeters).coerceIn(0.04, 0.22)
+                        u.patrolAngle = (u.patrolAngle + deltaTheta) % (2.0 * Math.PI)
+
+                        val orbLat = dest.lat + rLat * cos(u.patrolAngle)
+                        val orbLng = dest.lng + rLng * sin(u.patrolAngle)
                         u.position = GeoPoint(orbLat, orbLng)
+
+                        // Tangential heading continuously rotating 360° across all 4 directions (N, E, S, W)
                         val dLat = orbLat - prevLat
                         val dLng = orbLng - prevLng
                         val angleDeg = Math.toDegrees(Math.atan2(dLng, dLat))
@@ -803,23 +816,61 @@ class LocalGameState(private val context: Context) {
         return true
     }
 
+    fun setJetLockedTarget(unitId: String, targetUnitId: String?): Boolean {
+        val u = activeUnits.find { it.id == unitId } ?: return false
+        u.lockedTargetUnitId = targetUnitId
+        val target = if (targetUnitId != null) activeUnits.find { it.id == targetUnitId } else null
+        u.lockedTargetName = target?.let { "${it.ownerCallsign} • ${it.name}" }
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            if (target != null) {
+                it.onAlert("RADAR TRACK LOCKED", "${u.name} locked on ${target.name}!")
+            } else {
+                it.onAlert("TARGET UNLOCKED", "${u.name} unlocked radar track.")
+            }
+        }
+        saveLocalWorld()
+        return true
+    }
+
     fun fireManualMissile(unitId: String): Pair<Boolean, String> {
         val u = activeUnits.find { it.id == unitId } ?: return Pair(false, "Unit not found.")
 
-        // 100km Max Engagement Radius for Air-to-Air Missile
+        // 100km Max Engagement Radius for Air-to-Air Interceptor
         val maxRangeM = 100000.0
-        val targetUnit = activeUnits.filter { it.id != u.id }
-            .minByOrNull { GeoMath.calculateDistanceMeters(u.position, it.position) }
-            ?.takeIf { GeoMath.calculateDistanceMeters(u.position, it.position) <= maxRangeM }
 
-        val destPos = targetUnit?.position ?: u.targetPosition
-        val distMeters = GeoMath.calculateDistanceMeters(u.position, destPos)
-        if (distMeters > maxRangeM) {
-            return Pair(false, "Target beyond missile maximum range (100 km). Current: ${(distMeters / 1000).toInt()} km.")
+        // 1. Prioritize explicitly locked target
+        var targetUnit = if (!u.lockedTargetUnitId.isNullOrEmpty()) {
+            activeUnits.find { it.id == u.lockedTargetUnitId }
+        } else null
+
+        // 2. If locked target not found, auto-acquire closest hostile aircraft within 100km
+        if (targetUnit == null) {
+            targetUnit = activeUnits.filter { it.id != u.id && it.team != u.team }
+                .minByOrNull { GeoMath.calculateDistanceMeters(u.position, it.position) }
+                ?.takeIf { GeoMath.calculateDistanceMeters(u.position, it.position) <= maxRangeM }
         }
 
+        val destPos: GeoPoint
+        val targetName: String
+        val targetId: String?
+
+        if (targetUnit != null) {
+            destPos = targetUnit.position
+            targetName = "${targetUnit.ownerCallsign} • ${targetUnit.name}"
+            targetId = targetUnit.id
+        } else {
+            // Forward BVR projection along current heading for full 100km engagement envelope!
+            val headingRad = Math.toRadians(u.heading)
+            val dLat = (maxRangeM / 111139.0) * cos(headingRad)
+            val dLng = (maxRangeM / (111139.0 * cos(Math.toRadians(u.position.lat)).coerceAtLeast(0.01))) * sin(headingRad)
+            destPos = GeoPoint(u.position.lat + dLat, u.position.lng + dLng)
+            targetName = "Airspace Intercept Vector (100km Forward)"
+            targetId = null
+        }
+
+        val distMeters = GeoMath.calculateDistanceMeters(u.position, destPos)
         val missileId = "msl_" + UUID.randomUUID().toString().take(6)
-        val targetName = targetUnit?.let { "${it.ownerCallsign} • ${it.name}" } ?: "Designated Waypoint"
 
         listeners.forEach {
             it.onMissileFired(
@@ -829,7 +880,7 @@ class LocalGameState(private val context: Context) {
                 toLat = destPos.lat,
                 toLng = destPos.lng,
                 missileType = "air_to_air",
-                targetUnitId = targetUnit?.id,
+                targetUnitId = targetId,
                 targetName = targetName,
                 speedMach = 4.8,
                 hitProbability = 1.0
@@ -901,6 +952,64 @@ class LocalGameState(private val context: Context) {
         return Pair(true, "AIM-120D AMRAAM launched!")
     }
 
+    fun fireCruiseMissile(siloId: String, targetPos: GeoPoint): Pair<Boolean, String> {
+        val silo = structures.find { it.id == siloId && it.type == "missile_silo" && it.online }
+            ?: return Pair(false, "Missile launcher facility not found or offline.")
+
+        if (silo.missileMunitions <= 0) {
+            return Pair(false, "Silo depleted! Purchase BrahMos-ER Cruise Missile reload.")
+        }
+
+        val distM = GeoMath.calculateDistanceMeters(silo.position, targetPos)
+        if (distM > 200000.0) {
+            return Pair(false, "Target coordinates beyond 200km strategic range (${(distM / 1000).toInt()} km).")
+        }
+
+        silo.missileMunitions -= 1
+        val mslId = "cruise_" + UUID.randomUUID().toString().take(6)
+        listeners.forEach {
+            it.onStructuresUpdated(structures)
+            it.onMissileFired(
+                missileId = mslId,
+                fromLat = silo.position.lat,
+                fromLng = silo.position.lng,
+                toLat = targetPos.lat,
+                toLng = targetPos.lng,
+                missileType = "strategic_cruise",
+                targetUnitId = null,
+                targetName = "Strategic Grid Target [${(distM / 1000).toInt()} km]",
+                speedMach = 0.85,
+                hitProbability = 0.98
+            )
+            it.onAlert("CRUISE MISSILE LAUNCHED", "Heavy BrahMos-ER Cruise Missile launched from Silo towards target!")
+        }
+        saveLocalWorld()
+        return Pair(true, "BrahMos-ER Cruise Missile launched!")
+    }
+
+    fun reloadMissileSilo(siloId: String): Pair<Boolean, String> {
+        val silo = structures.find { it.id == siloId && it.type == "missile_silo" }
+            ?: return Pair(false, "Missile launcher facility not found.")
+
+        val cost = 850
+        if (player.wealth < cost) {
+            return Pair(false, "Insufficient funds ($$cost needed for BrahMos-ER missile reload).")
+        }
+        if (silo.missileMunitions >= silo.maxMissileSlots()) {
+            return Pair(false, "Missile Silo already at maximum capacity (${silo.maxMissileSlots()}).")
+        }
+
+        player.wealth -= cost
+        silo.missileMunitions = (silo.missileMunitions + 1).coerceAtMost(silo.maxMissileSlots())
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("SILO RELOADED", "Loaded 1x BrahMos-ER Cruise Missile into Silo (${silo.missileMunitions}/${silo.maxMissileSlots()}).")
+        }
+        saveLocalWorld()
+        return Pair(true, "Cruise missile reloaded.")
+    }
+
     fun destroyUnitInCombat(unitId: String, unitName: String) {
         val u = activeUnits.find { it.id == unitId } ?: return
         activeUnits.remove(u)
@@ -915,8 +1024,9 @@ class LocalGameState(private val context: Context) {
 
     fun spawnOpforBogey(): UnitItem {
         val center = player.position
-        val bogeyPos = GeoPoint(center.lat + 0.045, center.lng + 0.055)
-        val bogeyTarget = GeoPoint(center.lat - 0.035, center.lng - 0.045)
+        // Realistic long-range radar spawn: ~60km away bearing 045°
+        val bogeyPos = GeoPoint(center.lat + 0.38, center.lng + 0.42)
+        val bogeyTarget = GeoPoint(center.lat, center.lng)
         val bogey = UnitItem(
             id = "bogey_" + UUID.randomUUID().toString().take(6),
             ownerId = "opfor_commander",

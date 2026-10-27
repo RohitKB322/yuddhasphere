@@ -35,6 +35,7 @@ import com.yuddhasphere.ui.BuildMenuSheet
 import com.yuddhasphere.ui.MilitarySheet
 import com.yuddhasphere.ui.UnderProgressDialog
 import org.json.JSONObject
+import java.util.Locale
 
 class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameState.StateListener, GameClient.NetworkListener {
 
@@ -420,10 +421,27 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             updateRoeButtons("peaceful")
         }
 
+        // Tactical Map Zoom Controls (+ and -)
+        binding.btnMapZoomIn.setOnClickListener {
+            binding.mapWebView.evaluateJavascript("window.zoomIn();", null)
+        }
+        binding.btnMapZoomOut.setOnClickListener {
+            binding.mapWebView.evaluateJavascript("window.zoomOut();", null)
+        }
+
         // In-Flight Jet: Fox-2 Missile Manual Launch
         binding.btnLaunchFoxTwo.setOnClickListener {
             val jetId = activeSelectedJetId ?: return@setOnClickListener
-            gameState.fireManualMissile(jetId)
+            val res = gameState.fireManualMissile(jetId)
+            if (res.first) {
+                Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
+                val u = gameState.activeUnits.find { it.id == jetId }
+                if (u != null) {
+                    showJetSortieControl(u.id)
+                }
+            } else {
+                Toast.makeText(this, res.second, Toast.LENGTH_LONG).show()
+            }
         }
 
         // In-Flight Jet: Abort & RTB
@@ -875,7 +893,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         hideAllCards()
         activeSelectedJetId = jetId
         binding.cardJetSortieControl.visibility = View.VISIBLE
-        binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5);", null)
+        // Offset latitude by -0.0032 so aircraft stays nicely positioned above the bottom control card
+        binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5, true);", null)
 
         binding.tvJetControlTitle.text = "${u.name} (Sortie)"
         binding.tvJetCommanderCallsign.text = "PILOT: ${u.ownerCallsign.ifEmpty { "Commander" }}"
@@ -903,6 +922,26 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
         binding.tvJetWeaponsLoadout.text = "Armament: ${u.weaponsLoadout}"
 
+        // Radar Target Lock Status & Selection
+        if (!u.lockedTargetUnitId.isNullOrEmpty()) {
+            binding.btnSelectTarget.text = "🎯 LOCKED: ${u.lockedTargetName ?: "Target Aircraft"}"
+            binding.btnClearTarget.visibility = View.VISIBLE
+            binding.tvLockedTargetInfo.text = "Radar homing lock active • AIM-120D tracking target"
+        } else {
+            binding.btnSelectTarget.text = "🎯 SELECT TARGET TO LOCK"
+            binding.btnClearTarget.visibility = View.GONE
+            binding.tvLockedTargetInfo.text = "No target locked (Auto-homing or forward 100km projection)"
+        }
+
+        binding.btnSelectTarget.setOnClickListener {
+            showTargetSelectionDialog(u)
+        }
+
+        binding.btnClearTarget.setOnClickListener {
+            gameState.setJetLockedTarget(u.id, null)
+            showJetSortieControl(u.id)
+        }
+
         // Speed buttons styling
         if (u.speedMode == "supersonic") {
             binding.btnSpeedSupersonic.setBackgroundResource(R.drawable.bg_accent_button)
@@ -918,6 +957,31 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
         updateRadarArcButtons(u.radarConeAngle)
         updateRoeButtons(u.roe)
+    }
+
+    private fun showTargetSelectionDialog(firerJet: UnitItem) {
+        val targets = gameState.activeUnits.filter { it.id != firerJet.id }
+        if (targets.isEmpty()) {
+            Toast.makeText(this, "No other aircraft currently detected in airspace.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val targetItems = targets.map { target ->
+            val distKm = com.yuddhasphere.utils.GeoMath.calculateDistanceMeters(firerJet.position, target.position) / 1000.0
+            val isEnemy = target.team != firerJet.team
+            val tag = if (isEnemy) "[HOSTILE]" else "[FRIENDLY]"
+            "$tag ${target.ownerCallsign} • ${target.name}\nDist: ${String.format(Locale.US, "%.1f", distKm)} km | HP: ${target.hp}/${target.maxHp}"
+        }.toTypedArray()
+
+        android.app.AlertDialog.Builder(this, R.style.Theme_YuddhaSphere)
+            .setTitle("ACQUIRE RADAR TARGET LOCK")
+            .setItems(targetItems) { _, which ->
+                val chosenTarget = targets[which]
+                gameState.setJetLockedTarget(firerJet.id, chosenTarget.id)
+                showJetSortieControl(firerJet.id)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // --- 100% REAL LIVE GPS ONLY (No Sim Walker) ---
@@ -989,7 +1053,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         val u = gameState.activeUnits.find { it.id == jetId } ?: return
         hideAllCards()
         binding.cardHostileTargetInspector.visibility = View.VISIBLE
-        binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5);", null)
+        binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5, true);", null)
 
         binding.tvHostileTitle.text = "HOSTILE TARGET: ${u.name}"
         binding.tvHostileCallsign.text = "PILOT: ${u.ownerCallsign.ifEmpty { "[OPFOR] Hostile Pilot" }}"
@@ -1120,7 +1184,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         activeSelectedJetId?.let { id ->
             val u = units.find { it.id == id }
             if (u != null) {
-                binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng});", null)
+                binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, null, true);", null)
                 val fuel = u.fuelPercent.toInt()
                 binding.tvJetFuelPercent.text = "$fuel%"
                 binding.pbJetFuel.progress = fuel
@@ -1204,21 +1268,23 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         hideAllCards()
         binding.cardMissileTelemetry.visibility = View.VISIBLE
         val title = when (missileType) {
+            "strategic_cruise" -> "BRAHMOS-ER CRUISE MISSILE"
             "sam_interceptor" -> "MIM-104 PATRIOT PAC-3"
             "air_to_ground" -> "GBU-12 LASER-GUIDED BOMB"
             else -> "AIM-120D AMRAAM (BVR)"
         }
         val status = when (missileType) {
+            "strategic_cruise" -> "TERCOM / GPS STRATEGIC TRAJECTORY"
             "sam_interceptor" -> "SURFACE-TO-AIR ACTIVE RADAR GUIDANCE"
             "air_to_ground" -> "OPTICAL / LASER TERMINAL TRACKING"
             else -> "ACTIVE TERMINAL RADAR SEEKER LOCKED"
         }
         binding.tvMissileTitle.text = title
         binding.tvMissileStatus.text = status
-        binding.tvMissileSpeed.text = "Mach ${String.format("%.1f", speedMach)}"
-        binding.tvMissileEta.text = "${String.format("%.1f", etaSeconds)}s"
+        binding.tvMissileSpeed.text = "Mach ${String.format(Locale.US, "%.2f", speedMach)} (${(speedMach * 340 * 3.6).toInt()} km/h)"
+        binding.tvMissileEta.text = "${String.format(Locale.US, "%.1f", etaSeconds)}s"
         binding.tvMissilePk.text = "${(hitProbability * 100).toInt()}%"
-        binding.tvMissileTarget.text = "$targetName (Range: ${String.format("%.1f", distKm)} km)"
+        binding.tvMissileTarget.text = "$targetName (Range: ${String.format(Locale.US, "%.1f", distKm)} km)"
     }
 
     // --- NetworkListener Callbacks ---

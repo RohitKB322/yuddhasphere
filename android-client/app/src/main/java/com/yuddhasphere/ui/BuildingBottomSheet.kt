@@ -123,7 +123,7 @@ class BuildingBottomSheet(
             upgradeContainer.visibility = View.GONE
         }
 
-        // Specific actions for Airbase and SAM
+        // Specific actions for Airbase, SAM, and Missile Silo
         if (s.type == "airbase") {
             btnSpecific.visibility = View.VISIBLE
             btnSpecific.text = "✈ Open Hangar & Jet Catalog"
@@ -133,10 +133,19 @@ class BuildingBottomSheet(
             }
         } else if (s.type == "sam") {
             btnSpecific.visibility = View.VISIBLE
-            btnSpecific.text = "🚀 SAM Battery & Interceptors"
+            btnSpecific.text = "🚀 SAM Battery (${s.samMunitions}/${s.maxSamSlots()}) • Arm Battery"
             btnSpecific.setOnClickListener {
                 dialog?.dismiss()
                 onOpenMilitarySheet?.invoke()
+            }
+        } else if (s.type == "missile_silo") {
+            btnSpecific.visibility = View.VISIBLE
+            btnSpecific.text = "☢ Silo Munitions: ${s.missileMunitions}/${s.maxMissileSlots()} (Reload $850)"
+            btnSpecific.setOnClickListener {
+                val res = gameState.reloadMissileSilo(s.id)
+                if (res.first) {
+                    btnSpecific.text = "☢ Silo Munitions: ${s.missileMunitions}/${s.maxMissileSlots()} (Reload $850)"
+                }
             }
         } else {
             btnSpecific.visibility = View.GONE

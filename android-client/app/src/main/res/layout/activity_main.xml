@@ -172,6 +172,36 @@
             android:contentDescription="Alerts" />
     </LinearLayout>
 
+    <!-- TACTICAL MAP ZOOM CONTROLS (+ / -) -->
+    <LinearLayout
+        android:id="@+id/tacticalZoomControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="14dp"
+        android:layout_marginEnd="12dp"
+        android:elevation="14dp"
+        app:layout_constraintTop_toBottomOf="@id/topHudContainer"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageButton
+            android:id="@+id/btnMapZoomIn"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_glass_circle_btn"
+            android:src="@drawable/ic_zoom_in"
+            android:contentDescription="Zoom In (+)" />
+
+        <ImageButton
+            android:id="@+id/btnMapZoomOut"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_glass_circle_btn"
+            android:src="@drawable/ic_zoom_out"
+            android:contentDescription="Zoom Out (-)" />
+    </LinearLayout>
+
     <!-- SORTIE TARGETING BANNER -->
     <LinearLayout
         android:id="@+id/sortieTargetingBar"
@@ -803,6 +833,48 @@
                 android:textSize="10sp" />
         </LinearLayout>
 
+        <!-- Radar Target Selection Row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnSelectTarget"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-bold"
+                android:text="🎯 SELECT TARGET TO LOCK"
+                android:textColor="@color/accent_cyan"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnClearTarget"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-black"
+                android:text="✕"
+                android:textColor="@color/accent_red"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvLockedTargetInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:fontFamily="sans-serif-medium"
+            android:text="No target locked (Auto-homing or forward 100km projection)"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp" />
+
         <!-- Fox-2 Missile Fire Button -->
         <Button
             android:id="@+id/btnLaunchFoxTwo"
@@ -1430,82 +1502,76 @@
                 android:textSize="12sp" />
         </LinearLayout>
 
-        <!-- v0.5 Multiplayer Server Connection Settings -->
+        <!-- v0.5 Multiplayer Server Connection Info (Render Cloud Locked) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:fontFamily="sans-serif-bold"
-            android:text="v0.5 MULTIPLAYER SERVER (WEBSOCKET)"
+            android:text="MULTIPLAYER CLOUD MESH"
             android:textColor="@color/primary_neon"
             android:textSize="10.5sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="38dp"
             android:layout_marginTop="6dp"
-            android:orientation="horizontal">
+            android:background="@drawable/bg_pill_stat"
+            android:gravity="center_vertical"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-bold"
+                android:text="☁ Global Server (Render Cloud)"
+                android:textColor="@color/white"
+                android:textSize="11.5sp" />
+
+            <TextView
+                android:id="@+id/tvServerStatusBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="ONLINE"
+                android:textColor="@color/accent_green"
+                android:textSize="10.5sp" />
+        </LinearLayout>
+
+        <!-- Hidden inputs preserving binding compatibility -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone">
 
             <EditText
                 android:id="@+id/etServerHost"
                 android:layout_width="0dp"
                 android:layout_height="40dp"
                 android:layout_weight="2"
-                android:background="@drawable/bg_pill_stat"
-                android:hint="yuddhasphere-server.onrender.com"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:textColor="@color/white"
-                android:textColorHint="@color/text_muted"
-                android:textSize="12sp" />
+                android:text="yuddhasphere-server.onrender.com" />
 
             <EditText
                 android:id="@+id/etServerPort"
                 android:layout_width="0dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="6dp"
                 android:layout_weight="1"
-                android:background="@drawable/bg_pill_stat"
-                android:hint="Port (443 / 8080)"
-                android:inputType="number"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:textColor="@color/white"
-                android:textColorHint="@color/text_muted"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <!-- Presets Row -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:orientation="horizontal">
+                android:text="443" />
 
             <Button
                 android:id="@+id/btnPresetEmulator"
-                android:layout_width="0dp"
-                android:layout_height="32dp"
-                android:layout_weight="1.2"
-                android:background="@drawable/bg_accent_button"
-                android:fontFamily="sans-serif-black"
-                android:text="☁ Render Cloud"
-                android:textColor="@color/bg_tactical_dark"
-                android:textSize="9.5sp" />
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
 
             <Button
                 android:id="@+id/btnPresetLocalhost"
-                android:layout_width="0dp"
-                android:layout_height="32dp"
-                android:layout_marginStart="4dp"
-                android:layout_weight="1"
-                android:background="@drawable/bg_secondary_button"
-                android:text="Local (Hotspot)"
-                android:textColor="@color/text_secondary"
-                android:textSize="9.5sp" />
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
         </LinearLayout>
 
-        <!-- Server Status & Ping -->
+        <!-- Server Ping -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -1513,15 +1579,10 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/tvServerStatusBadge"
+            <View
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:fontFamily="sans-serif-bold"
-                android:text="Status: AUTONOMOUS"
-                android:textColor="@color/accent_orange"
-                android:textSize="10.5sp" />
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <Button
                 android:id="@+id/btnTestServerConnection"

@@ -232,7 +232,8 @@ class LocalGameState(private val context: Context) {
                                     role = jObj.optString("role", "Air Superiority"),
                                     hp = jObj.optInt("hp", 100),
                                     maxHp = jObj.optInt("maxHp", 100),
-                                    status = jObj.optString("status", "Ready in Hangar")
+                                    status = jObj.optString("status", "Ready in Hangar"),
+                                    flaresRemaining = jObj.optInt("flaresRemaining", 3)
                                 )
                             )
                         }
@@ -276,7 +277,9 @@ class LocalGameState(private val context: Context) {
                             radarConeAngle = uObj.optInt("radarConeAngle", 60),
                             roe = uObj.optString("roe", "fire_at_will"),
                             lockedTargetUnitId = if (uObj.has("lockedTargetUnitId") && !uObj.isNull("lockedTargetUnitId")) uObj.getString("lockedTargetUnitId") else null,
-                            lockedTargetName = if (uObj.has("lockedTargetName") && !uObj.isNull("lockedTargetName")) uObj.getString("lockedTargetName") else null
+                            lockedTargetName = if (uObj.has("lockedTargetName") && !uObj.isNull("lockedTargetName")) uObj.getString("lockedTargetName") else null,
+                            flaresRemaining = uObj.optInt("flaresRemaining", 3),
+                            bombsRemaining = uObj.optInt("bombsRemaining", 2)
                         )
                         activeUnits.add(unit)
                     }
@@ -704,6 +707,7 @@ class LocalGameState(private val context: Context) {
                 base.hangarJets.removeAt(jetIndex)
             } else {
                 base.hangarJets[jetIndex].status = "Ready in Hangar"
+                base.hangarJets[jetIndex].flaresRemaining = 3 // Re-armed!
             }
         }
     }
@@ -793,7 +797,9 @@ class LocalGameState(private val context: Context) {
             fuelPercent = 100.0,
             weaponsLoadout = cat?.weapons ?: "2x GBU-12 Guided Bombs • 2x AIM-120",
             damage = cat?.damage ?: 60,
-            homeBaseId = base.id
+            homeBaseId = base.id,
+            flaresRemaining = jet.flaresRemaining,
+            bombsRemaining = 2
         )
 
         activeUnits.add(sortie)
@@ -1059,7 +1065,7 @@ class LocalGameState(private val context: Context) {
             name = "Agni-II Ballistic Missile",
             role = "Medium-Range Ballistic Missile (MRBM)",
             cost = 1200,
-            rangeKm = 350,
+            rangeKm = 2500,
             speedMach = 5.2,
             payload = "1,000kg Thermobaric / High-Explosive Warhead",
             guidance = "Inertial Navigation + Star Tracker Guidance",
@@ -1071,7 +1077,7 @@ class LocalGameState(private val context: Context) {
             name = "BGM-109 Tomahawk Cruise Missile",
             role = "Subsonic Precision Land-Attack Cruise Missile",
             cost = 750,
-            rangeKm = 250,
+            rangeKm = 1500,
             speedMach = 0.85,
             payload = "450kg WDU-36/B High Explosive Warhead",
             guidance = "TERCOM + DSMAC Digital Scene Matching",
@@ -1083,7 +1089,7 @@ class LocalGameState(private val context: Context) {
             name = "DF-17 Hypersonic Glide Vehicle",
             role = "Boost-Glide Waverider Hypersonic Weapon",
             cost = 1800,
-            rangeKm = 400,
+            rangeKm = 2000,
             speedMach = 8.5,
             payload = "High-Penetration Kinetic Energy Warhead",
             guidance = "Atmospheric Waverider Cosine Glide Vectoring",
@@ -1095,7 +1101,7 @@ class LocalGameState(private val context: Context) {
             name = "CBU-97 Sensor-Fused Cluster Missile",
             role = "Wide-Area Submunition Dispenser Missile",
             cost = 1100,
-            rangeKm = 200,
+            rangeKm = 1000,
             speedMach = 1.8,
             payload = "12x BLU-108 Guided Submunition Skeets",
             guidance = "Mid-Course Inertial + Terminal Area Airburst",
@@ -1107,7 +1113,7 @@ class LocalGameState(private val context: Context) {
             name = "AGM-158C LRASM (Anti-Ship/Radar Seeker)",
             role = "Long-Range Active Radar Homing Missile",
             cost = 1400,
-            rangeKm = 300,
+            rangeKm = 1000,
             speedMach = 2.4,
             payload = "450kg Penetrating Blast-Fragmentation Warhead",
             guidance = "60° Active Millimeter-Wave Seeker Radar Sweep",
@@ -1159,7 +1165,14 @@ class LocalGameState(private val context: Context) {
         }
 
         if (silo.equippedMissiles.isEmpty()) {
-            return Pair(false, "Missile Silo empty! Procure missiles from the Missile Market.")
+            if (silo.missileMunitions > 0) {
+                val defaults = listOf("missile_ballistic", "missile_cruise", "missile_hypersonic", "missile_cluster", "missile_antiship")
+                for (i in 0 until silo.missileMunitions.coerceAtMost(silo.maxMissileSlots())) {
+                    silo.equippedMissiles.add(defaults[i % defaults.size])
+                }
+            } else {
+                return Pair(false, "Missile Silo empty! Procure missiles from the Missile Market.")
+            }
         }
 
         val idx = silo.equippedMissiles.indexOf(missileType).let { if (it >= 0) it else 0 }
@@ -1185,6 +1198,89 @@ class LocalGameState(private val context: Context) {
         }
         saveLocalWorld()
         return Pair(true, "${msl.name} launched!")
+    }
+
+    fun dropJetBomb(unitId: String, targetPos: GeoPoint): Pair<Boolean, String> {
+        val u = activeUnits.find { it.id == unitId }
+            ?: return Pair(false, "Aircraft not found or not in flight.")
+
+        if (u.bombsRemaining <= 0) {
+            return Pair(false, "${u.name} has exhausted its bomb payload. RTB to rearm.")
+        }
+
+        val distM = GeoMath.calculateDistanceMeters(u.position, targetPos)
+        if (distM > 45000.0) {
+            return Pair(false, "Target coordinates beyond bomb release envelope (${(distM / 1000).toInt()} km > 45 km).")
+        }
+
+        u.bombsRemaining -= 1
+        val bombId = "bomb_" + UUID.randomUUID().toString().take(6)
+        listeners.forEach {
+            it.onUnitsUpdated(activeUnits)
+            it.onMissileFired(
+                missileId = bombId,
+                fromLat = u.position.lat,
+                fromLng = u.position.lng,
+                toLat = targetPos.lat,
+                toLng = targetPos.lng,
+                missileType = "bomb",
+                targetUnitId = null,
+                targetName = "Ground Strike Target [${(distM / 1000).toInt()} km]",
+                speedMach = 0.45,
+                hitProbability = 0.96
+            )
+            it.onAlert("BOMBS AWAY!", "${u.name} released GBU-12 Laser-Guided Bomb! (${u.bombsRemaining} bombs left)")
+        }
+        saveLocalWorld()
+        return Pair(true, "Laser-guided bomb released!")
+    }
+
+    fun applyExplosionDamage(impactPos: GeoPoint, missileType: String): List<Structure> {
+        val warheadDamage = when (missileType) {
+            "missile_ballistic", "ballistic" -> 450
+            "missile_hypersonic", "hypersonic" -> 380
+            "missile_cruise", "strategic_cruise", "cruise" -> 250
+            "missile_cluster", "cluster" -> 220
+            "missile_antiship", "antiship" -> 260
+            "bomb", "air_to_ground" -> 200
+            else -> 100
+        }
+        val blastRadiusMeters = when (missileType) {
+            "missile_ballistic", "ballistic" -> 15000.0 // 15km blast radius
+            "missile_hypersonic", "hypersonic" -> 10000.0 // 10km kinetic crater
+            "missile_cluster", "cluster" -> 8000.0   // 8km wide-area bomblets
+            "missile_cruise", "strategic_cruise", "cruise" -> 6000.0 // 6km precision blast
+            "missile_antiship", "antiship" -> 5000.0
+            "bomb", "air_to_ground" -> 4000.0
+            else -> 3000.0
+        }
+
+        val damagedStructures = mutableListOf<Structure>()
+        structures.forEach { s ->
+            val dist = GeoMath.calculateDistanceMeters(s.position, impactPos)
+            if (dist <= blastRadiusMeters) {
+                val factor = (1.0 - (dist / blastRadiusMeters) * 0.5).coerceIn(0.5, 1.0)
+                val dmg = (warheadDamage * factor).toInt()
+                s.hp = (s.hp - dmg).coerceAtLeast(0)
+                if (s.hp <= 0) {
+                    s.hp = 0
+                    s.online = false
+                }
+                damagedStructures.add(s)
+            }
+        }
+
+        if (damagedStructures.isNotEmpty()) {
+            saveLocalWorld()
+            listeners.forEach { listener ->
+                listener.onStructuresUpdated(structures)
+                damagedStructures.forEach { s ->
+                    val statusText = if (s.hp == 0) "OFFLINE / DESTROYED" else "HP: ${s.hp}/${s.maxHp}"
+                    listener.onAlert("KINETIC IMPACT!", "${s.name} took heavy damage from $missileType! ($statusText)")
+                }
+            }
+        }
+        return damagedStructures
     }
 
     fun fireCruiseMissile(siloId: String, targetPos: GeoPoint): Pair<Boolean, String> {

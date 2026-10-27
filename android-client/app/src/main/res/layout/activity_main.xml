@@ -655,6 +655,16 @@
                         android:text="• PATROL"
                         android:textColor="@color/accent_orange"
                         android:textSize="9.5sp" />
+
+                    <TextView
+                        android:id="@+id/tvJetFlaresCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:fontFamily="sans-serif-bold"
+                        android:text="• FLARES: 3/3"
+                        android:textColor="@color/white"
+                        android:textSize="9.5sp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -879,7 +889,7 @@
                 android:layout_width="0dp"
                 android:layout_height="28dp"
                 android:layout_marginStart="4dp"
-                android:layout_weight="1.2"
+                android:layout_weight="1.1"
                 android:background="@drawable/bg_accent_button"
                 android:fontFamily="sans-serif-black"
                 android:gravity="center"
@@ -889,6 +899,23 @@
                 android:padding="0dp"
                 android:text="🚀 FOX-2"
                 android:textColor="@color/bg_tactical_dark"
+                android:textSize="9.5sp" />
+
+            <Button
+                android:id="@+id/btnDropBomb"
+                android:layout_width="0dp"
+                android:layout_height="28dp"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1.1"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-black"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="💣 BOMB"
+                android:textColor="@color/accent_orange"
                 android:textSize="9.5sp" />
         </LinearLayout>
 
@@ -1255,6 +1282,133 @@
                 android:text="🎯 FOX-2 (100km)"
                 android:textColor="@color/bg_tactical_dark"
                 android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- TARGET ACTION POPUP (MAP POINT OR HOSTILE INSTALLATION TAP) -->
+    <LinearLayout
+        android:id="@+id/cardTargetActionPopup"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/bg_transparent_glass"
+        android:elevation="25dp"
+        android:orientation="vertical"
+        android:padding="10dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/tvTargetActionIcon"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:background="@drawable/bg_accent_button"
+                android:gravity="center"
+                android:text="🎯"
+                android:textColor="@color/bg_tactical_dark"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvTargetActionTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="TARGET VECTOR"
+                    android:textColor="@color/white"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/tvTargetActionCoord"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="28.6139°N, 77.2090°E • Range: 180 km"
+                    android:textColor="@color/accent_orange"
+                    android:textSize="9.5sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnTargetDismiss"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Dismiss" />
+        </LinearLayout>
+
+        <!-- Quick Strike Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnTargetLaunchMissile"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1.4"
+                android:background="@drawable/bg_accent_button"
+                android:fontFamily="sans-serif-black"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="🚀 LAUNCH MISSILE HERE"
+                android:textColor="@color/bg_tactical_dark"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btnTargetDropBomb"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="💣 DROP BOMB"
+                android:textColor="@color/accent_orange"
+                android:textSize="9.5sp" />
+
+            <Button
+                android:id="@+id/btnTargetSendSortie"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_secondary_button"
+                android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
+                android:text="✈ SORTIE"
+                android:textColor="@color/accent_cyan"
+                android:textSize="9.5sp" />
         </LinearLayout>
     </LinearLayout>
 

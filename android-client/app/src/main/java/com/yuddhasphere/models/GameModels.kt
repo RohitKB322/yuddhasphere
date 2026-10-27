@@ -53,7 +53,8 @@ data class HangarJetItem(
     val role: String,
     var hp: Int,
     val maxHp: Int,
-    var status: String = "Ready in Hangar"
+    var status: String = "Ready in Hangar",
+    var flaresRemaining: Int = 3
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
@@ -64,6 +65,7 @@ data class HangarJetItem(
             put("hp", hp)
             put("maxHp", maxHp)
             put("status", status)
+            put("flaresRemaining", flaresRemaining)
         }
     }
 }
@@ -173,7 +175,9 @@ data class UnitItem(
     var radarConeAngle: Int = 60, // 30, 60, or 90 degrees
     var roe: String = "fire_at_will", // "aggressive", "fire_at_will", "peaceful"
     var lockedTargetUnitId: String? = null,
-    var lockedTargetName: String? = null
+    var lockedTargetName: String? = null,
+    var flaresRemaining: Int = 3,
+    var bombsRemaining: Int = 2
 ) {
     fun toJsonObject(): JSONObject {
         return JSONObject().apply {
@@ -201,6 +205,8 @@ data class UnitItem(
             put("roe", roe)
             put("lockedTargetUnitId", lockedTargetUnitId ?: "")
             put("lockedTargetName", lockedTargetName ?: "")
+            put("flaresRemaining", flaresRemaining)
+            put("bombsRemaining", bombsRemaining)
         }
     }
 }

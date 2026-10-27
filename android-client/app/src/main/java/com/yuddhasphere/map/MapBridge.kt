@@ -24,6 +24,9 @@ class MapBridge(private val listener: BridgeListener) {
             distKm: Double
         )
         fun onUnitShotDown(unitId: String, unitName: String)
+        fun onMapPointClicked(lat: Double, lng: Double, structureId: String, structureName: String, isEnemy: Boolean)
+        fun onDetonationImpact(lat: Double, lng: Double, missileType: String)
+        fun onJetFlaresDeployed(unitId: String, flaresRemaining: Int, isDecoyed: Boolean)
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -81,5 +84,20 @@ class MapBridge(private val listener: BridgeListener) {
     @JavascriptInterface
     fun onUnitShotDown(unitId: String, unitName: String) {
         mainHandler.post { listener.onUnitShotDown(unitId, unitName) }
+    }
+
+    @JavascriptInterface
+    fun onMapPointClicked(lat: Double, lng: Double, structureId: String, structureName: String, isEnemy: Boolean) {
+        mainHandler.post { listener.onMapPointClicked(lat, lng, structureId, structureName, isEnemy) }
+    }
+
+    @JavascriptInterface
+    fun onDetonationImpact(lat: Double, lng: Double, missileType: String) {
+        mainHandler.post { listener.onDetonationImpact(lat, lng, missileType) }
+    }
+
+    @JavascriptInterface
+    fun onJetFlaresDeployed(unitId: String, flaresRemaining: Int, isDecoyed: Boolean) {
+        mainHandler.post { listener.onJetFlaresDeployed(unitId, flaresRemaining, isDecoyed) }
     }
 }

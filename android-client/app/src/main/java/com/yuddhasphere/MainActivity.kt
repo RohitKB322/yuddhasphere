@@ -37,7 +37,9 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.yuddhasphere.ui.MilitarySheet
 import com.yuddhasphere.ui.ProcurementSheet
+import com.yuddhasphere.ui.StrikeCoordinatorSheet
 import com.yuddhasphere.ui.UnderProgressDialog
+import com.yuddhasphere.utils.GeoMath
 import org.json.JSONObject
 import java.util.Locale
 
@@ -238,6 +240,71 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnCloseHostileInspector.setOnClickListener {
             binding.cardHostileTargetInspector.visibility = View.GONE
         }
+
+        // Close Missile Telemetry HUD
+        binding.btnCloseMissileTelemetry.setOnClickListener {
+            binding.cardMissileTelemetry.visibility = View.GONE
+            binding.mapWebView.evaluateJavascript("window.untrackMissile();", null)
+        }
+
+        // Target Action Popup Listeners (Map Point & Structure Taps)
+        binding.btnTargetDismiss.setOnClickListener {
+            binding.cardTargetActionPopup.visibility = View.GONE
+            binding.mapWebView.evaluateJavascript("window.clearWeaponRangeCircle();", null)
+        }
+
+        binding.btnTargetLaunchMissile.setOnClickListener {
+            val target = currentActionTargetPos ?: return@setOnClickListener
+            binding.cardTargetActionPopup.visibility = View.GONE
+            StrikeCoordinatorSheet(this, target, currentActionTargetName, gameState).show()
+        }
+
+        binding.btnTargetDropBomb.setOnClickListener {
+            val target = currentActionTargetPos ?: return@setOnClickListener
+            val airborneJets = gameState.activeUnits.filter {
+                (it.ownerId == gameState.player.id || it.team == gameState.player.team) && it.bombsRemaining > 0
+            }
+            if (airborneJets.isEmpty()) {
+                Toast.makeText(this, "No airborne aircraft equipped with bombs! Launch a jet from an Airbase first.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+
+            val closestJet = airborneJets.minByOrNull { GeoMath.calculateDistanceMeters(it.position, target) }!!
+            val distM = GeoMath.calculateDistanceMeters(closestJet.position, target)
+            binding.cardTargetActionPopup.visibility = View.GONE
+
+            if (distM <= 45000.0) {
+                gameState.dropJetBomb(closestJet.id, target)
+            } else {
+                closestJet.order = "strike"
+                closestJet.targetPosition = target
+                Toast.makeText(this, "${closestJet.name} re-routed to strike coordinates (${(distM / 1000).toInt()}km away). Bomb will drop upon arrival!", Toast.LENGTH_LONG).show()
+                gameState.saveLocalWorld()
+            }
+        }
+
+        binding.btnTargetSendSortie.setOnClickListener {
+            val target = currentActionTargetPos ?: return@setOnClickListener
+            binding.cardTargetActionPopup.visibility = View.GONE
+            val airbases = gameState.structures.filter { it.type == "airbase" && it.ownerId == gameState.player.id }
+            if (airbases.isEmpty()) {
+                Toast.makeText(this, "No operational Airbases! Build an Airbase first.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val readyBases = airbases.filter { base -> base.hangarJets.any { it.status == "Ready in Hangar" } }
+            if (readyBases.isEmpty()) {
+                Toast.makeText(this, "All aircraft in flight or hangars empty.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val base = readyBases.first()
+            val jet = base.hangarJets.first { it.status == "Ready in Hangar" }
+            val res = gameState.launchSortieFromHangar(base.id, jet.id, target, currentActionTargetStructureId.ifBlank { null }, "strike")
+            if (res.first) {
+                Toast.makeText(this, "${jet.name} scrambled from ${base.name} on strike vector!", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun showMilitarySheet() {
@@ -271,14 +338,44 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     private var pendingTargetingHangarJetId: String? = null
     private var pendingTargetingCruiseSiloId: String? = null
     private var pendingTargetingMissileType: String? = null
+    private var pendingTargetingBombJetId: String? = null
+    private var currentActionTargetPos: GeoPoint? = null
+    private var currentActionTargetName: String = ""
+    private var currentActionTargetStructureId: String = ""
+    private var isCurrentActionTargetEnemy: Boolean = false
 
     private fun promptMissileTargeting(siloId: String, missileType: String) {
+        val silo = gameState.structures.find { it.id == siloId }
         pendingTargetingCruiseSiloId = siloId
         pendingTargetingMissileType = missileType
         binding.sortieTargetingBar.visibility = View.VISIBLE
         binding.bottomNavBar.visibility = View.GONE
         val msl = gameState.getMissileInfo(missileType)
         binding.tvSortieHint.text = "🎯 Tap target on map (within ${msl.rangeKm}km) to launch ${msl.name}"
+        if (silo != null) {
+            val rangeMeters = msl.rangeKm * 1000.0
+            binding.mapWebView.evaluateJavascript(
+                "window.showWeaponRangeCircle(${silo.position.lat}, ${silo.position.lng}, $rangeMeters, '#FF5722', '${msl.name.uppercase()} LAUNCH ENVELOPE (${msl.rangeKm} KM)');",
+                null
+            )
+        }
+        binding.mapWebView.evaluateJavascript("window.startSortieTargeting();", null)
+    }
+
+    private fun promptBombDropTargeting(jetId: String) {
+        val u = gameState.activeUnits.find { it.id == jetId } ?: return
+        if (u.bombsRemaining <= 0) {
+            Toast.makeText(this, "${u.name} has exhausted its bomb payload! RTB to rearm.", Toast.LENGTH_SHORT).show()
+            return
+        }
+        pendingTargetingBombJetId = jetId
+        binding.sortieTargetingBar.visibility = View.VISIBLE
+        binding.bottomNavBar.visibility = View.GONE
+        binding.tvSortieHint.text = "💣 Tap ground target on map (within 45km) to release GBU-12 Guided Bomb"
+        binding.mapWebView.evaluateJavascript(
+            "window.showWeaponRangeCircle(${u.position.lat}, ${u.position.lng}, 45000.0, '#FFA000', 'GBU-12 BOMB RELEASE ENVELOPE (45 KM)');",
+            null
+        )
         binding.mapWebView.evaluateJavascript("window.startSortieTargeting();", null)
     }
 
@@ -291,9 +388,11 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         pendingTargetingHangarJetId = null
         pendingTargetingCruiseSiloId = null
         pendingTargetingMissileType = null
+        pendingTargetingBombJetId = null
         isRetargetingMode = false
         binding.sortieTargetingBar.visibility = View.GONE
         binding.bottomNavBar.visibility = View.VISIBLE
+        binding.mapWebView.evaluateJavascript("window.clearWeaponRangeCircle();", null)
         binding.mapWebView.evaluateJavascript("window.cancelSortieTargeting();", null)
     }
 
@@ -587,10 +686,13 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         if (activeSelectedJetId != null) {
             binding.mapWebView.evaluateJavascript("window.untrackJet();", null)
         }
+        binding.mapWebView.evaluateJavascript("window.untrackMissile();", null)
+        binding.mapWebView.evaluateJavascript("window.clearWeaponRangeCircle();", null)
         binding.cardStructureInspector.visibility = View.GONE
         binding.cardJetSortieControl.visibility = View.GONE
         binding.cardMissileTelemetry.visibility = View.GONE
         binding.cardHostileTargetInspector.visibility = View.GONE
+        binding.cardTargetActionPopup.visibility = View.GONE
         binding.cardCommanderSetup.visibility = View.GONE
         binding.cardCommanderProfile.visibility = View.GONE
         binding.overlayReportsScreen.visibility = View.GONE
@@ -598,6 +700,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.overlayMarketScreen.visibility = View.GONE
         activeInspectedStructureId = null
         activeSelectedJetId = null
+        currentActionTargetPos = null
     }
 
     private fun showCommanderRegistration() {
@@ -1040,6 +1143,12 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5, true);", null)
         binding.mapWebView.evaluateJavascript("window.trackJet('${jetId}');", null)
 
+        // Display operational combat radius circle
+        binding.mapWebView.evaluateJavascript(
+            "window.showWeaponRangeCircle(${u.position.lat}, ${u.position.lng}, ${u.rangeMeters.toDouble()}, '#00E5FF', '${u.name.uppercase()} COMBAT RADIUS (${u.rangeMeters / 1000} KM)');",
+            null
+        )
+
         binding.tvJetControlTitle.text = "${u.name} (Sortie)"
         binding.tvJetCommanderCallsign.text = "PILOT: ${u.ownerCallsign.ifEmpty { "Commander" }}"
         val orderDesc = when (u.order) {
@@ -1048,6 +1157,21 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             else -> "RETURNING TO AIRBASE (RTB)"
         }
         binding.tvJetControlStatus.text = orderDesc
+        binding.tvJetFlaresCount.text = "• FLARES: ${u.flaresRemaining}/3"
+
+        binding.btnDropBomb.text = "💣 BOMB (${u.bombsRemaining})"
+        binding.btnDropBomb.isEnabled = u.bombsRemaining > 0
+        binding.btnDropBomb.setOnClickListener {
+            if (!u.lockedTargetUnitId.isNullOrEmpty()) {
+                val tgt = gameState.activeUnits.find { it.id == u.lockedTargetUnitId }
+                if (tgt != null) {
+                    gameState.dropJetBomb(u.id, tgt.position)
+                    showJetSortieControl(u.id)
+                    return@setOnClickListener
+                }
+            }
+            promptBombDropTargeting(u.id)
+        }
 
         val fuel = u.fuelPercent.toInt()
         binding.tvJetFuelPercent.text = "$fuel%"
@@ -1180,7 +1304,13 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onBuildingClicked(structureId: String) {
-        showStructureInspector(structureId)
+        val s = gameState.structures.find { it.id == structureId } ?: return
+        val isOwnBuilding = (s.ownerId == gameState.player.id || s.team == gameState.player.team)
+        if (isOwnBuilding) {
+            showStructureInspector(structureId)
+        } else {
+            showTargetActionPopup(s.position.lat, s.position.lng, s.id, s.name, isEnemy = true)
+        }
     }
 
     override fun onJetClicked(jetId: String) {
@@ -1190,6 +1320,46 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             showJetSortieControl(jetId)
         } else {
             showHostileTargetInspector(jetId)
+        }
+    }
+
+    private fun showTargetActionPopup(
+        lat: Double,
+        lng: Double,
+        structureId: String,
+        structureName: String,
+        isEnemy: Boolean
+    ) {
+        hideAllCards()
+        currentActionTargetPos = GeoPoint(lat, lng)
+        currentActionTargetStructureId = structureId
+        currentActionTargetName = structureName
+        isCurrentActionTargetEnemy = isEnemy
+
+        val nearestStruct = gameState.structures.minByOrNull {
+            GeoMath.calculateDistanceMeters(it.position, GeoPoint(lat, lng))
+        }
+        val distKm = if (nearestStruct != null) {
+            (GeoMath.calculateDistanceMeters(nearestStruct.position, GeoPoint(lat, lng)) / 1000).toInt()
+        } else 0
+
+        if (isEnemy && structureName.isNotBlank()) {
+            binding.tvTargetActionTitle.text = "🎯 HOSTILE TARGET: $structureName"
+            binding.tvTargetActionCoord.text = "${String.format(Locale.US, "%.4f°N, %.4f°E", lat, lng)} • ${distKm}km from ${nearestStruct?.name ?: "Base"}"
+            binding.tvTargetActionCoord.setTextColor(Color.parseColor("#FF453A"))
+        } else {
+            binding.tvTargetActionTitle.text = "🎯 DESIGNATED STRIKE GRID"
+            binding.tvTargetActionCoord.text = "${String.format(Locale.US, "%.4f°N, %.4f°E", lat, lng)} • ${distKm}km from ${nearestStruct?.name ?: "Base"}"
+            binding.tvTargetActionCoord.setTextColor(Color.parseColor("#FF9500"))
+        }
+
+        binding.cardTargetActionPopup.visibility = View.VISIBLE
+
+        val silos = gameState.structures.filter { it.type == "missile_silo" && it.ownerId == gameState.player.id }
+        if (silos.isNotEmpty()) {
+            val nearestSilo = silos.minByOrNull { GeoMath.calculateDistanceMeters(it.position, GeoPoint(lat, lng)) }!!
+            val siloDistKm = (GeoMath.calculateDistanceMeters(nearestSilo.position, GeoPoint(lat, lng)) / 1000).toInt()
+            binding.tvTargetActionCoord.text = "${binding.tvTargetActionCoord.text} | ${siloDistKm}km to ${nearestSilo.name}"
         }
     }
 
@@ -1257,6 +1427,16 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onSortieTargetPicked(lat: Double, lng: Double, targetStructureId: String) {
+        if (pendingTargetingBombJetId != null) {
+            val jetId = pendingTargetingBombJetId!!
+            cancelSortieTargetingMode()
+            val res = gameState.dropJetBomb(jetId, GeoPoint(lat, lng))
+            if (!res.first) {
+                Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+
         if (pendingTargetingCruiseSiloId != null) {
             val siloId = pendingTargetingCruiseSiloId!!
             val mslType = pendingTargetingMissileType ?: "missile_cruise"
@@ -1396,7 +1576,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 put("speedMach", speedMach)
                 put("hitProbability", hitProbability)
             }
-            val script = "window.launchActiveMissile(${missileObj}); window.trackMissile('${missileId}');"
+            // Launch active missile (do NOT auto-track on launch; camera follows only when clicked)
+            val script = "window.launchActiveMissile(${missileObj});"
             binding.mapWebView.evaluateJavascript(script, null)
         }
     }
@@ -1415,6 +1596,31 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
     override fun onUnitShotDown(unitId: String, unitName: String) {
         gameState.destroyUnitInCombat(unitId, unitName)
+    }
+
+    override fun onMapPointClicked(lat: Double, lng: Double, structureId: String, structureName: String, isEnemy: Boolean) {
+        showTargetActionPopup(lat, lng, structureId, structureName, isEnemy)
+    }
+
+    override fun onDetonationImpact(lat: Double, lng: Double, missileType: String) {
+        val damaged = gameState.applyExplosionDamage(GeoPoint(lat, lng), missileType)
+        if (damaged.isNotEmpty()) {
+            syncWorldToMap()
+        }
+    }
+
+    override fun onJetFlaresDeployed(unitId: String, flaresRemaining: Int, isDecoyed: Boolean) {
+        val u = gameState.activeUnits.find { it.id == unitId } ?: return
+        u.flaresRemaining = flaresRemaining
+        gameState.saveLocalWorld()
+        if (activeSelectedJetId == unitId) {
+            binding.tvJetFlaresCount.text = "• FLARES: ${u.flaresRemaining}/3"
+        }
+        if (isDecoyed) {
+            Toast.makeText(this, "🎯 DECOY SUCCESS! ${u.name} spoofed incoming missile with flares!", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "⚠️ FLARES POPPED! ${u.name} deployed countermeasures! (${flaresRemaining}/3 left)", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun showMissileTelemetry(
@@ -1440,8 +1646,28 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             "air_to_ground" -> "OPTICAL / LASER TERMINAL TRACKING"
             else -> "ACTIVE TERMINAL RADAR SEEKER LOCKED"
         }
-        binding.tvMissileTitle.text = title
-        binding.tvMissileStatus.text = status
+        val enhancedTitle = when (missileType) {
+            "missile_ballistic", "ballistic" -> "AGNI-II BALLISTIC MISSILE (MRBM)"
+            "missile_hypersonic", "hypersonic" -> "DF-17 HYPERSONIC GLIDE VEHICLE"
+            "missile_cruise", "cruise", "strategic_cruise" -> "BGM-109 TOMAHAWK CRUISE"
+            "missile_cluster", "cluster" -> "CBU-97 SENSOR-FUSED CLUSTER"
+            "missile_antiship", "antiship" -> "AGM-158C LRASM RADAR HOMING"
+            "bomb", "air_to_ground" -> "GBU-12 LASER-GUIDED BOMB"
+            "sam_interceptor" -> "MIM-104 PATRIOT PAC-3"
+            else -> title
+        }
+        val enhancedStatus = when (missileType) {
+            "missile_ballistic", "ballistic" -> "SUB-ORBITAL PARABOLIC ACCELERATING DESCENT"
+            "missile_hypersonic", "hypersonic" -> "ATMOSPHERIC WAVERIDER COSINE EVASION"
+            "missile_cluster", "cluster" -> "TERMINAL AIRBURST SUBMUNITION DISPENSER"
+            "missile_antiship", "antiship" -> "60° NOSE RADAR SEEKER ACTIVE HOMING"
+            "bomb", "air_to_ground" -> "GRAVITY-DESCENT LASER-GUIDED GLIDE"
+            "sam_interceptor" -> "SURFACE-TO-AIR ACTIVE RADAR GUIDANCE"
+            "strategic_cruise", "missile_cruise", "cruise" -> "TERCOM / GPS LOW-ALTITUDE CRUISE"
+            else -> status
+        }
+        binding.tvMissileTitle.text = enhancedTitle
+        binding.tvMissileStatus.text = enhancedStatus
         binding.tvMissileSpeed.text = "Mach ${String.format(Locale.US, "%.2f", speedMach)} (${(speedMach * 340 * 3.6).toInt()} km/h)"
         binding.tvMissileEta.text = "${String.format(Locale.US, "%.1f", etaSeconds)}s"
         binding.tvMissilePk.text = "${(hitProbability * 100).toInt()}%"

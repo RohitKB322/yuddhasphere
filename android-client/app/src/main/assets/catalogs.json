@@ -85,12 +85,12 @@
     {
       "id": "int_long",
       "name": "Long-Range SAM",
-      "rangeMeters": 80000,
-      "hitChance": 0.85,
+      "rangeMeters": 100000,
+      "hitChance": 0.95,
       "cost": 600,
       "reloadSeconds": 60,
       "assetKey": "interceptor.int_long",
-      "description": "Strategic theater air shield with high accuracy against incoming sorties (80 km BVR)."
+      "description": "Strategic theater air shield with high accuracy against incoming sorties (100 km BVR)."
     }
   ],
   "groundUnits": [

@@ -1047,6 +1047,144 @@
         </LinearLayout>
     </LinearLayout>
 
+    <!-- HOSTILE TARGET INSPECTOR & AIR DEFENSE ENGAGEMENT CARD -->
+    <LinearLayout
+        android:id="@+id/cardHostileTargetInspector"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="20dp"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/bg_danger_button"
+                android:gravity="center"
+                android:text="🎯"
+                android:textSize="16sp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvHostileTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="HOSTILE TARGET: Su-27 Flanker"
+                    android:textColor="@color/accent_red"
+                    android:textSize="15.5sp" />
+
+                <TextView
+                    android:id="@+id/tvHostileCallsign"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="PILOT: [OPFOR] Col. Volkov"
+                    android:textColor="@color/accent_orange"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnCloseHostileInspector"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <!-- Threat Metrics -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_slot_empty"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tvHostileRange"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-bold"
+                android:text="RANGE: 18.2 km"
+                android:textColor="@color/accent_gold"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvHostileHp"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-bold"
+                android:text="HP: 180 / 180"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <TextView
+                android:id="@+id/tvHostileSpeed"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-bold"
+                android:text="Mach 0.8"
+                android:textColor="@color/accent_cyan"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Combat Engagement Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/btnEngageSam"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_danger_button"
+                android:fontFamily="sans-serif-black"
+                android:text="🚀 SAM INTERCEPT"
+                android:textColor="@color/white"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/btnEngageAirFox2"
+                android:layout_width="0dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_accent_button"
+                android:fontFamily="sans-serif-black"
+                android:text="🎯 FOX-2 (100km)"
+                android:textColor="@color/bg_tactical_dark"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
     <!-- ========================================================================= -->
     <!-- 🔴 OVERLAY: 24/7 TACTICAL WAR WIRE & BREAKING NEWS BROADCAST (FULL SCREEN) -->
     <!-- 3. COMMANDER PROFILE CARD (Transparent bottom sheet when tapping Avatar on map) -->

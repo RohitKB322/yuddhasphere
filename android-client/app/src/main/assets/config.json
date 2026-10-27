@@ -119,14 +119,14 @@
     "sam": {
       "name": "SAM Defence Site",
       "category": "defense",
-      "radiusMeters": 400,
+      "radiusMeters": 100000,
       "radiusType": "defense",
       "incomePerHour": 0,
       "hp": 350,
       "buildCost": 750,
       "baseInterceptorSlots": 6,
       "slotsPerLevel": 6,
-      "description": "Surface-to-air missile site to shoot down incoming aerial strikes."
+      "description": "Surface-to-air missile theater umbrella (100km radar and interceptor envelope)."
     },
     "radar": {
       "name": "Radar / Watchtower",

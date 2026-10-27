@@ -217,6 +217,11 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnCloseMissileTelemetry.setOnClickListener {
             binding.cardMissileTelemetry.visibility = View.GONE
         }
+
+        // Close Hostile Target Inspector HUD
+        binding.btnCloseHostileInspector.setOnClickListener {
+            binding.cardHostileTargetInspector.visibility = View.GONE
+        }
     }
 
     private fun showMilitarySheet() {
@@ -556,6 +561,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.cardStructureInspector.visibility = View.GONE
         binding.cardJetSortieControl.visibility = View.GONE
         binding.cardMissileTelemetry.visibility = View.GONE
+        binding.cardHostileTargetInspector.visibility = View.GONE
         binding.cardCommanderSetup.visibility = View.GONE
         binding.cardCommanderProfile.visibility = View.GONE
         binding.overlayReportsScreen.visibility = View.GONE
@@ -938,8 +944,19 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         }
     }
 
+    override fun onPause() {
+        super.onPause()
+        gameState.saveLocalWorld()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        gameState.saveLocalWorld()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        gameState.saveLocalWorld()
         locationTracker.stopTracking()
         gameClient.disconnect()
         gameState.removeListener(this)
@@ -959,7 +976,68 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onJetClicked(jetId: String) {
-        showJetSortieControl(jetId)
+        val u = gameState.activeUnits.find { it.id == jetId } ?: return
+        val isOwnJet = (u.ownerId == gameState.player.id || u.team == gameState.player.team)
+        if (isOwnJet) {
+            showJetSortieControl(jetId)
+        } else {
+            showHostileTargetInspector(jetId)
+        }
+    }
+
+    private fun showHostileTargetInspector(jetId: String) {
+        val u = gameState.activeUnits.find { it.id == jetId } ?: return
+        hideAllCards()
+        binding.cardHostileTargetInspector.visibility = View.VISIBLE
+        binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5);", null)
+
+        binding.tvHostileTitle.text = "HOSTILE TARGET: ${u.name}"
+        binding.tvHostileCallsign.text = "PILOT: ${u.ownerCallsign.ifEmpty { "[OPFOR] Hostile Pilot" }}"
+
+        val distKm = com.yuddhasphere.utils.GeoMath.calculateDistanceMeters(gameState.player.position, u.position) / 1000.0
+        binding.tvHostileRange.text = "RANGE: ${String.format("%.1f", distKm)} km"
+        binding.tvHostileHp.text = "HP: ${u.hp} / ${u.maxHp}"
+        binding.tvHostileSpeed.text = if (u.speedMode == "supersonic") "Mach 1.6" else "Mach 0.8"
+
+        // Action 1: Surface-to-Air Missile Intercept
+        binding.btnEngageSam.setOnClickListener {
+            val res = gameState.fireSamAtTarget(u.id)
+            if (res.first) {
+                Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
+                binding.cardHostileTargetInspector.visibility = View.GONE
+            } else {
+                Toast.makeText(this, res.second, Toast.LENGTH_LONG).show()
+            }
+        }
+
+        // Action 2: Air-to-Air 100km Fox-2 Missile Launch
+        binding.btnEngageAirFox2.setOnClickListener {
+            val friendlyFighter = gameState.activeUnits.find { it.ownerId == gameState.player.id }
+            if (friendlyFighter != null) {
+                val res = gameState.fireFox2AtTarget(friendlyFighter.id, u.id)
+                if (res.first) {
+                    Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
+                    binding.cardHostileTargetInspector.visibility = View.GONE
+                } else {
+                    Toast.makeText(this, res.second, Toast.LENGTH_LONG).show()
+                }
+            } else {
+                // If no friendly jet in the air, check if airbase has ready fighter to scramble
+                val base = gameState.structures.find { it.type == "airbase" && it.online }
+                val readyJet = base?.hangarJets?.find { it.status == "Ready in Hangar" }
+                if (base != null && readyJet != null) {
+                    val scrambleRes = gameState.launchSortieFromHangar(base.id, readyJet.id, u.position, null, "strike")
+                    if (scrambleRes.first) {
+                        Toast.makeText(this, "Fighter scrambled from Airbase to intercept ${u.name}!", Toast.LENGTH_SHORT).show()
+                        binding.cardHostileTargetInspector.visibility = View.GONE
+                    } else {
+                        Toast.makeText(this, scrambleRes.second, Toast.LENGTH_LONG).show()
+                    }
+                } else {
+                    Toast.makeText(this, "No friendly fighters airborne or ready in Hangar! Procure a fighter at your Airbase.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     override fun onPlayerAvatarClicked() {

@@ -666,8 +666,15 @@
             const marker = L.marker([lat, lng], { icon: unitIcon, zIndexOffset: 950 }).addTo(map);
             marker.on('click', function(e) {
               L.DomEvent.stopPropagation(e);
-              selectedJetId = u.id;
-              renderRadarCone(u);
+              if (u.team === 'blue' || !u.team) {
+                selectedJetId = u.id;
+                renderRadarCone(u);
+              } else {
+                if (radarArcPolygon && map) {
+                  map.removeLayer(radarArcPolygon);
+                  radarArcPolygon = null;
+                }
+              }
               if (window.AndroidBridge && window.AndroidBridge.onJetClicked) {
                 window.AndroidBridge.onJetClicked(u.id);
               }
@@ -678,8 +685,8 @@
             unitMarkers[u.id].setIcon(unitIcon);
           }
 
-          // If currently selected, live-update its radar cone!
-          if (isSelected) {
+          // If currently selected friendly jet, live-update its radar cone!
+          if (isSelected && (u.team === 'blue' || !u.team)) {
             renderRadarCone(u);
           }
 
@@ -860,14 +867,17 @@
         }
       });
 
-      // Frame-by-frame Homing Step
+      let lastTime = performance.now();
+      const missileSpeedMps = 2400; // Hypersonic interceptor velocity
+
+      // Frame-by-frame True Proportional Navigation Homing Step
       function step(now) {
         if (missileObj.finished) return;
 
-        const elapsed = now - missileObj.startTime;
-        const progress = Math.min(elapsed / missileObj.durationMs, 1.0);
+        const dtSec = Math.min(0.1, (now - lastTime) / 1000);
+        lastTime = now;
 
-        // Dynamic Homing: update destination if target aircraft is moving!
+        // Dynamic Homing: continuously acquire live target aircraft coordinates!
         if (missileObj.targetUnitId && unitsCache) {
           const liveTarget = unitsCache.find(u => u.id === missileObj.targetUnitId);
           if (liveTarget && liveTarget.position) {
@@ -876,17 +886,23 @@
           }
         }
 
-        const curLat = missileObj.startLat + (missileObj.targetLat - missileObj.startLat) * progress;
-        const curLng = missileObj.startLng + (missileObj.targetLng - missileObj.startLng) * progress;
-        missileObj.curLat = curLat;
-        missileObj.curLng = curLng;
+        const dLat = missileObj.targetLat - missileObj.curLat;
+        const dLng = missileObj.targetLng - missileObj.curLng;
+        const distRemainingM = computeDistanceMeters(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng);
 
-        // Dynamic heading towards destination
-        const dLat = missileObj.targetLat - curLat;
-        const dLng = missileObj.targetLng - curLng;
+        // Turn towards target (heading)
         const headingDeg = (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
 
-        missileMarker.setLatLng([curLat, curLng]);
+        // Advance missile along dynamic vector towards target!
+        const stepDistM = Math.max(missileSpeedMps * dtSec, distRemainingM * 0.05);
+        const stepRatio = distRemainingM > 0 ? Math.min(1.0, stepDistM / distRemainingM) : 1.0;
+
+        const prevLat = missileObj.curLat;
+        const prevLng = missileObj.curLng;
+        missileObj.curLat += dLat * stepRatio;
+        missileObj.curLng += dLng * stepRatio;
+
+        missileMarker.setLatLng([missileObj.curLat, missileObj.curLng]);
         const markerEl = missileMarker.getElement();
         if (markerEl) {
           const wrapper = markerEl.querySelector('.tactical-missile-marker');
@@ -896,25 +912,22 @@
         }
 
         trailLine.setLatLngs([
-          [
-            missileObj.startLat + (missileObj.targetLat - missileObj.startLat) * Math.max(0, progress - 0.25),
-            missileObj.startLng + (missileObj.targetLng - missileObj.startLng) * Math.max(0, progress - 0.25)
-          ],
-          [curLat, curLng]
+          [prevLat, prevLng],
+          [missileObj.curLat, missileObj.curLng]
         ]);
 
-        if (progress < 1.0) {
-          requestAnimationFrame(step);
-        } else {
-          // Terminal Impact Reached!
+        // Terminal proximity impact: within 80 meters or reached target
+        if (distRemainingM <= 80 || stepRatio >= 1.0) {
           missileObj.finished = true;
           delete activeMissiles[id];
 
           map.removeLayer(missileMarker);
           map.removeLayer(trailLine);
 
-          // Trigger Detonation Blast & Supersonic Expanding Shockwave
+          // Direct impact detonation & guaranteed neutralization
           triggerDetonationShockwave(missileObj.targetLat, missileObj.targetLng, missileObj);
+        } else {
+          requestAnimationFrame(step);
         }
       }
 
@@ -927,7 +940,7 @@
 
       // 1. Core Fireball Flash
       const fireball = L.circle([lat, lng], {
-        radius: 12,
+        radius: 14,
         color: '#FFD600',
         weight: 3,
         fillColor: '#FFFFFF',
@@ -936,7 +949,7 @@
 
       // 2. High-Velocity Supersonic Shockwave Ring
       const shockwave = L.circle([lat, lng], {
-        radius: 15,
+        radius: 18,
         color: '#00E5FF',
         weight: 3.5,
         fillColor: '#FF453A',
@@ -945,7 +958,7 @@
 
       // 3. Secondary Thermal Blast Ring
       const secondaryWave = L.circle([lat, lng], {
-        radius: 8,
+        radius: 10,
         color: '#FF9F0A',
         weight: 2,
         fillColor: '#FF9F0A',
@@ -959,20 +972,20 @@
         const progress = frame / maxFrames;
 
         // Shockwaves expand rapidly across 200+ meters
-        shockwave.setRadius(15 + progress * 190);
+        shockwave.setRadius(18 + progress * 200);
         shockwave.setStyle({
           opacity: Math.max(0, 0.95 - progress * 0.9),
           fillOpacity: Math.max(0, 0.45 - progress * 0.45),
           weight: Math.max(1, 3.5 * (1 - progress))
         });
 
-        secondaryWave.setRadius(8 + progress * 130);
+        secondaryWave.setRadius(10 + progress * 140);
         secondaryWave.setStyle({
           opacity: Math.max(0, 0.8 - progress * 0.8),
           fillOpacity: Math.max(0, 0.25 - progress * 0.25)
         });
 
-        fireball.setRadius(12 + progress * 35);
+        fireball.setRadius(14 + progress * 40);
         fireball.setStyle({
           fillColor: progress < 0.4 ? '#FFFFFF' : '#FF453A',
           opacity: Math.max(0, 0.9 - progress * 0.9),
@@ -987,12 +1000,10 @@
         }
       }, 35);
 
-      // If targeting an aircraft and hit succeeds:
+      // GUARANTEED direct neutralization when intercepting target unit
       if (missileObj && missileObj.targetUnitId) {
-        if (Math.random() <= missileObj.hitProbability) {
-          if (window.AndroidBridge && window.AndroidBridge.onUnitShotDown) {
-            window.AndroidBridge.onUnitShotDown(missileObj.targetUnitId, missileObj.targetName);
-          }
+        if (window.AndroidBridge && window.AndroidBridge.onUnitShotDown) {
+          window.AndroidBridge.onUnitShotDown(missileObj.targetUnitId, missileObj.targetName);
         }
       }
     }

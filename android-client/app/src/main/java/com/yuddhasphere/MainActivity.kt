@@ -212,6 +212,11 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnCancelSortie.setOnClickListener {
             cancelSortieTargetingMode()
         }
+
+        // Close Missile Telemetry HUD
+        binding.btnCloseMissileTelemetry.setOnClickListener {
+            binding.cardMissileTelemetry.visibility = View.GONE
+        }
     }
 
     private fun showMilitarySheet() {
@@ -550,6 +555,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     private fun hideAllCards() {
         binding.cardStructureInspector.visibility = View.GONE
         binding.cardJetSortieControl.visibility = View.GONE
+        binding.cardMissileTelemetry.visibility = View.GONE
         binding.cardCommanderSetup.visibility = View.GONE
         binding.cardCommanderProfile.visibility = View.GONE
         binding.overlayReportsScreen.visibility = View.GONE
@@ -865,7 +871,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.cardJetSortieControl.visibility = View.VISIBLE
         binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5);", null)
 
-        binding.tvJetControlTitle.text = "${u.name} (Lead Sortie)"
+        binding.tvJetControlTitle.text = "${u.name} (Sortie)"
+        binding.tvJetCommanderCallsign.text = "PILOT: ${u.ownerCallsign.ifEmpty { "Commander" }}"
         val orderDesc = when (u.order) {
             "strike" -> "STRIKE MISSION • EN ROUTE"
             "patrol" -> "AIR COMBAT PATROL (CAP)"
@@ -1061,11 +1068,79 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         Toast.makeText(this, "Upgrade Complete: ${structure.name} (L${structure.level})", Toast.LENGTH_LONG).show()
     }
 
-    override fun onMissileFired(fromLat: Double, fromLng: Double, toLat: Double, toLng: Double, missileType: String) {
+    override fun onMissileFired(
+        missileId: String,
+        fromLat: Double,
+        fromLng: Double,
+        toLat: Double,
+        toLng: Double,
+        missileType: String,
+        targetUnitId: String?,
+        targetName: String,
+        speedMach: Double,
+        hitProbability: Double
+    ) {
         if (isMapReady) {
-            val script = "window.animateMissileLaunch($fromLat, $fromLng, $toLat, $toLng, '$missileType');"
+            val missileObj = JSONObject().apply {
+                put("id", missileId)
+                put("fromLat", fromLat)
+                put("fromLng", fromLng)
+                put("toLat", toLat)
+                put("toLng", toLng)
+                put("missileType", missileType)
+                put("targetUnitId", targetUnitId ?: "")
+                put("targetName", targetName)
+                put("speedMach", speedMach)
+                put("hitProbability", hitProbability)
+            }
+            val script = "window.launchActiveMissile(${missileObj});"
             binding.mapWebView.evaluateJavascript(script, null)
         }
+    }
+
+    override fun onMissileClicked(
+        missileId: String,
+        missileType: String,
+        targetName: String,
+        speedMach: Double,
+        etaSeconds: Double,
+        hitProbability: Double,
+        distKm: Double
+    ) {
+        showMissileTelemetry(missileId, missileType, targetName, speedMach, etaSeconds, hitProbability, distKm)
+    }
+
+    override fun onUnitShotDown(unitId: String, unitName: String) {
+        gameState.destroyUnitInCombat(unitId, unitName)
+    }
+
+    private fun showMissileTelemetry(
+        missileId: String,
+        missileType: String,
+        targetName: String,
+        speedMach: Double,
+        etaSeconds: Double,
+        hitProbability: Double,
+        distKm: Double
+    ) {
+        hideAllCards()
+        binding.cardMissileTelemetry.visibility = View.VISIBLE
+        val title = when (missileType) {
+            "sam_interceptor" -> "MIM-104 PATRIOT PAC-3"
+            "air_to_ground" -> "GBU-12 LASER-GUIDED BOMB"
+            else -> "AIM-120D AMRAAM (BVR)"
+        }
+        val status = when (missileType) {
+            "sam_interceptor" -> "SURFACE-TO-AIR ACTIVE RADAR GUIDANCE"
+            "air_to_ground" -> "OPTICAL / LASER TERMINAL TRACKING"
+            else -> "ACTIVE TERMINAL RADAR SEEKER LOCKED"
+        }
+        binding.tvMissileTitle.text = title
+        binding.tvMissileStatus.text = status
+        binding.tvMissileSpeed.text = "Mach ${String.format("%.1f", speedMach)}"
+        binding.tvMissileEta.text = "${String.format("%.1f", etaSeconds)}s"
+        binding.tvMissilePk.text = "${(hitProbability * 100).toInt()}%"
+        binding.tvMissileTarget.text = "$targetName (Range: ${String.format("%.1f", distKm)} km)"
     }
 
     // --- NetworkListener Callbacks ---

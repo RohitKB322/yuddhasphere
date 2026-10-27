@@ -586,13 +586,24 @@
                     android:textSize="16sp" />
 
                 <TextView
+                    android:id="@+id/tvJetCommanderCallsign"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="1dp"
+                    android:fontFamily="sans-serif-black"
+                    android:text="COMMANDER: [BRAVO] Maverick"
+                    android:textColor="@color/accent_cyan"
+                    android:textSize="11sp" />
+
+                <TextView
                     android:id="@+id/tvJetControlStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
                     android:fontFamily="sans-serif-bold"
                     android:text="AIR STRIKE MISSION • EN ROUTE"
                     android:textColor="@color/accent_orange"
-                    android:textSize="11.5sp" />
+                    android:textSize="11sp" />
             </LinearLayout>
 
             <ImageButton
@@ -713,9 +724,9 @@
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_secondary_button"
-                android:text="30° Track"
+                android:text="30° (300km)"
                 android:textColor="@color/white"
-                android:textSize="10.5sp" />
+                android:textSize="9.5sp" />
 
             <Button
                 android:id="@+id/btnRadarArc60"
@@ -724,10 +735,10 @@
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_accent_button"
-                android:text="60° Sector"
+                android:text="60° (180km)"
                 android:textColor="@color/bg_tactical_dark"
                 android:fontFamily="sans-serif-black"
-                android:textSize="10.5sp" />
+                android:textSize="9.5sp" />
 
             <Button
                 android:id="@+id/btnRadarArc90"
@@ -736,9 +747,9 @@
                 android:layout_marginStart="4dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_secondary_button"
-                android:text="90° Wide"
+                android:text="90° (80km)"
                 android:textColor="@color/white"
-                android:textSize="10.5sp" />
+                android:textSize="9.5sp" />
         </LinearLayout>
 
         <!-- Rules of Engagement (Tactics) -->
@@ -845,6 +856,194 @@
                 android:text="Patrol Orbit"
                 android:textColor="@color/white"
                 android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- IN-FLIGHT MISSILE TELEMETRY INSPECTION CARD -->
+    <LinearLayout
+        android:id="@+id/cardMissileTelemetry"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_glass_card"
+        android:elevation="20dp"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="@drawable/bg_accent_button"
+                android:gravity="center"
+                android:text="🚀"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvMissileTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:text="AIM-120D AMRAAM (BVR)"
+                    android:textColor="@color/accent_orange"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:id="@+id/tvMissileStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-bold"
+                    android:text="ACTIVE HOMING • TERMINAL RADAR LOCK"
+                    android:textColor="@color/accent_cyan"
+                    android:textSize="10.5sp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/btnCloseMissileTelemetry"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_menu"
+                android:contentDescription="Close" />
+        </LinearLayout>
+
+        <!-- Telemetry Data Grid -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal"
+            android:weightSum="3">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_slot_empty"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SPEED"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="9.5sp"
+                    android:fontFamily="sans-serif-bold" />
+
+                <TextView
+                    android:id="@+id/tvMissileSpeed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Mach 4.2"
+                    android:textColor="@color/white"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-black" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_slot_empty"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="TIME TO IMPACT"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="9.5sp"
+                    android:fontFamily="sans-serif-bold" />
+
+                <TextView
+                    android:id="@+id/tvMissileEta"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="3.4s"
+                    android:textColor="@color/accent_orange"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-black" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_slot_empty"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="HIT PROB P(k)"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="9.5sp"
+                    android:fontFamily="sans-serif-bold" />
+
+                <TextView
+                    android:id="@+id/tvMissilePk"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="88%"
+                    android:textColor="@color/accent_green"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-black" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Target Track Info -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_slot_empty"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="TARGET TRACK: "
+                android:textColor="@color/accent_cyan"
+                android:textSize="10sp"
+                android:fontFamily="sans-serif-black" />
+
+            <TextView
+                android:id="@+id/tvMissileTarget"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Hostile Su-27 Flanker (Range: 24.5 km)"
+                android:textColor="@color/white"
+                android:textSize="10.5sp"
+                android:fontFamily="sans-serif-bold" />
         </LinearLayout>
     </LinearLayout>
 

@@ -121,6 +121,7 @@ data class Structure(
 data class UnitItem(
     val id: String,
     val ownerId: String,
+    var ownerCallsign: String = "Commander",
     val team: String,
     val teamColor: String,
     val catalogId: String,
@@ -134,7 +135,7 @@ data class UnitItem(
     var order: String = "strike", // "strike", "patrol", "rtb"
     var speedMode: String = "subsonic", // "subsonic", "supersonic"
     var speedMps: Double = 220.0,
-    var rangeMeters: Int = 15000,
+    var rangeMeters: Int = 80000,
     var fuelPercent: Double = 100.0,
     var weaponsLoadout: String = "2x GBU-12 Laser-Guided • 2x AIM-120 AMRAAM",
     var damage: Int = 60,
@@ -148,6 +149,7 @@ data class UnitItem(
         return JSONObject().apply {
             put("id", id)
             put("ownerId", ownerId)
+            put("ownerCallsign", ownerCallsign)
             put("team", team)
             put("teamColor", teamColor)
             put("catalogId", catalogId)

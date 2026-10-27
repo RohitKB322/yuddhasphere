@@ -148,18 +148,69 @@
     }
     .jet-callsign-tag {
       position: absolute;
-      bottom: -11px;
+      bottom: -13px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(10, 16, 28, 0.9);
-      border: 1px solid rgba(255, 159, 10, 0.8);
-      border-radius: 3px;
-      padding: 0px 4px;
-      font-size: 8px;
-      font-weight: bold;
-      color: #FF9F0A;
+      background: rgba(7, 11, 20, 0.95);
+      border: 1px solid rgba(0, 229, 255, 0.7);
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 8.5px;
       white-space: nowrap;
       pointer-events: none;
+      display: flex;
+      align-items: center;
+      z-index: 1000;
+    }
+    .jet-owner-badge {
+      font-weight: 900;
+      letter-spacing: 0.3px;
+    }
+
+    /* Supersonic Interceptor / Cruise Missile Marker */
+    .tactical-missile-marker {
+      width: 26px;
+      height: 26px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.08s linear;
+    }
+    .tactical-missile-marker:active {
+      transform: scale(1.3);
+    }
+    .missile-hud-pill {
+      position: absolute;
+      top: -12px;
+      background: rgba(10, 16, 28, 0.95);
+      border: 1px solid #FF9F0A;
+      color: #FF9F0A;
+      font-size: 7.5px;
+      font-weight: 900;
+      padding: 0 3px;
+      border-radius: 3px;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 0 8px rgba(255, 159, 10, 0.6);
+    }
+
+    /* Tactical HUD Leaflet Popup */
+    .tactical-hud-popup .leaflet-popup-content-wrapper {
+      background: transparent !important;
+      box-shadow: none !important;
+      padding: 0 !important;
+    }
+    .tactical-hud-popup .leaflet-popup-tip {
+      background: rgba(10, 16, 28, 0.95) !important;
+      border: 1px solid #00E5FF !important;
+    }
+    .tactical-hud-popup .leaflet-popup-content {
+      margin: 0 !important;
+      line-height: 1.3 !important;
     }
 
     /* Center Crosshair */
@@ -508,15 +559,37 @@
       });
     };
 
+    // Helper: Haversine distance in meters
+    function computeDistanceMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // Realistic Tactical Radar Ranges:
+    // 30° Aperture: 300 km (300,000m) - Long-Range Narrow Beam Track
+    // 60° Aperture: 180 km (180,000m) - Medium Tactical Sector
+    // 90° Aperture: 80 km (80,000m)   - Wide-Angle Situational Scan
+    function getRadarRangeMeters(coneAngle) {
+      if (coneAngle <= 30) return 300000;
+      if (coneAngle >= 90) return 80000;
+      return 180000;
+    }
+
     // Calculate forward sector polygon for jet radar arc
     function computeRadarSectorCoords(centerLat, centerLng, headingDeg, coneAngleDeg, rangeMeters) {
       const coords = [[centerLat, centerLng]];
       const halfAngle = (coneAngleDeg || 60) / 2;
       const startAngle = headingDeg - halfAngle;
       const endAngle = headingDeg + halfAngle;
-      const steps = 12;
+      const steps = 24;
       const earthRadius = 6378137;
-      const d = (rangeMeters || 1500) / earthRadius;
+      const d = (rangeMeters || 180000) / earthRadius;
       const centerLatRad = centerLat * Math.PI / 180;
       const centerLngRad = centerLng * Math.PI / 180;
 
@@ -559,18 +632,26 @@
           const lng = u.position.lng;
           const isSelected = selectedJetId === u.id;
           const heading = u.heading || 0;
-          const strokeColor = u.teamColor || '#FF9F0A';
+          const isEnemy = u.team && u.team !== 'blue';
+          const strokeColor = u.teamColor || (isEnemy ? '#FF3B30' : '#00E5FF');
+          const ownerCallsign = u.ownerCallsign || (isEnemy ? '[OPFOR] Pilot' : 'Commander');
+          const callsignColor = isEnemy ? '#FF453A' : '#00E5FF';
+          const afterburnerGlow = isEnemy ? '#FF3B30' : '#00E5FF';
 
-          // Delta Wing Supersonic Fighter Jet Icon
+          // Delta Wing Supersonic Fighter Jet Icon with Callsign & Owner Tag
           const jetHtml = `
             <div class="jet-marker-wrapper ${isSelected ? 'selected' : ''}" style="transform: rotate(${heading}deg);">
               <svg viewBox="0 0 40 40" width="40" height="40">
                 <!-- Delta Wing Fighter Jet -->
                 <path fill="#0E1726" stroke="${strokeColor}" stroke-width="2.2" stroke-linejoin="round" d="M20 3 L23 13 L36 22 L36 26 L23 23 L23 32 L26 35 L26 37 L20 35 L14 37 L14 35 L17 32 L17 23 L4 26 L4 22 L17 13 Z"/>
                 <!-- Afterburner Flame / Engine Glow -->
-                <circle cx="20" cy="35" r="2.5" fill="#00E5FF"/>
+                <circle cx="20" cy="35" r="2.5" fill="${afterburnerGlow}"/>
               </svg>
-              <div class="jet-callsign-tag" style="transform: translateX(-50%) rotate(-${heading}deg);">${u.name}</div>
+              <div class="jet-callsign-tag" style="transform: translateX(-50%) rotate(-${heading}deg);">
+                <span class="jet-owner-badge" style="color:${callsignColor};">${ownerCallsign}</span>
+                <span style="color:#8E8E93; margin: 0 2px;">•</span>
+                <span style="color:#FFF;">${u.name}</span>
+              </div>
             </div>
           `;
 
@@ -608,7 +689,7 @@
               [u.position.lat, u.position.lng],
               [u.targetPosition.lat, u.targetPosition.lng]
             ];
-            const pathColor = u.order === 'patrol' ? '#00E5FF' : '#FF9F0A';
+            const pathColor = isEnemy ? '#FF3B30' : (u.order === 'patrol' ? '#00E5FF' : '#FF9F0A');
             if (!unitFlightPaths[u.id]) {
               unitFlightPaths[u.id] = L.polyline(pathCoords, {
                 color: pathColor,
@@ -631,15 +712,16 @@
       if (!map) return;
       const coneAngle = u.radarConeAngle || 60;
       const heading = u.heading || 0;
-      const sectorCoords = computeRadarSectorCoords(u.position.lat, u.position.lng, heading, coneAngle, 1200);
+      const rangeMeters = getRadarRangeMeters(coneAngle);
+      const sectorCoords = computeRadarSectorCoords(u.position.lat, u.position.lng, heading, coneAngle, rangeMeters);
 
       if (!radarArcPolygon) {
         radarArcPolygon = L.polygon(sectorCoords, {
           color: '#00E5FF',
           weight: 1.5,
-          dashArray: '4, 4',
+          dashArray: '5, 5',
           fillColor: '#00E5FF',
-          fillOpacity: 0.14,
+          fillOpacity: 0.12,
           interactive: false
         }).addTo(map);
       } else {
@@ -647,79 +729,283 @@
       }
     }
 
-    // High-Speed Animated Missile Streak & Detonation Blast
-    window.animateMissileLaunch = function(startLat, startLng, endLat, endLng, missileType) {
+    // Active In-Flight Missiles System with Dynamic Homing, Clickable Telemetry, & Detonation Blast Waves
+    const activeMissiles = {};
+
+    window.launchActiveMissile = function(data) {
       if (!map) return;
 
-      const missileColor = missileType === 'sam_interceptor' ? '#30D158' : '#FF9F0A';
-      const durationMs = 1200;
-      const startTime = performance.now();
+      const id = data.id || ('msl_' + Math.random().toString(36).substring(2, 8));
+      const missileType = data.missileType || 'air_to_air';
+      const startLat = data.fromLat;
+      const startLng = data.fromLng;
+      let targetLat = data.toLat;
+      let targetLng = data.toLng;
+      const targetUnitId = data.targetUnitId && data.targetUnitId.length > 0 ? data.targetUnitId : null;
+      const targetName = data.targetName || (targetUnitId ? 'Hostile Aircraft' : 'Ground Vector Target');
+      const speedMach = data.speedMach || 4.2;
+      const hitProbability = data.hitProbability || 0.88;
 
-      // Missile Icon
+      const missileColor = missileType === 'sam_interceptor' ? '#30D158' : (missileType === 'air_to_ground' ? '#FF453A' : '#FF9F0A');
+      const missileTitle = missileType === 'sam_interceptor' ? 'PATRIOT PAC-3' : (missileType === 'air_to_ground' ? 'GBU-12 PAVEWAY' : 'AIM-120D AMRAAM');
+
+      // Clickable Needle Supersonic Missile SVG
       const missileHtml = `
-        <div style="width: 14px; height: 14px; display: flex; align-items: center; justify-content: center;">
-          <div style="width: 8px; height: 8px; background: ${missileColor}; border-radius: 50%; box-shadow: 0 0 10px ${missileColor}, 0 0 18px #FFF;"></div>
+        <div class="tactical-missile-marker">
+          <svg viewBox="0 0 24 24" width="24" height="24" style="filter: drop-shadow(0 0 6px ${missileColor});">
+            <path d="M12 2 L14 8 L14 19 L16 22 L12 20 L8 22 L10 19 L10 8 Z" fill="#FFFFFF" stroke="${missileColor}" stroke-width="1.2"/>
+            <circle cx="12" cy="21" r="2.5" fill="#FFD600"/>
+          </svg>
+          <div class="missile-hud-pill">MACH ${speedMach.toFixed(1)}</div>
         </div>
       `;
+
       const missileIcon = L.divIcon({
         className: '',
         html: missileHtml,
-        iconSize: [14, 14],
-        iconAnchor: [7, 7]
+        iconSize: [26, 26],
+        iconAnchor: [13, 13]
       });
 
-      const missileMarker = L.marker([startLat, startLng], { icon: missileIcon, zIndexOffset: 2000 }).addTo(map);
+      const missileMarker = L.marker([startLat, startLng], {
+        icon: missileIcon,
+        zIndexOffset: 3000,
+        interactive: true
+      }).addTo(map);
+
       const trailLine = L.polyline([[startLat, startLng], [startLat, startLng]], {
         color: missileColor,
         weight: 2.5,
-        opacity: 0.85
+        opacity: 0.85,
+        dashArray: '3, 4'
       }).addTo(map);
 
-      function step(now) {
-        const elapsed = now - startTime;
-        const progress = Math.min(elapsed / durationMs, 1.0);
+      const initialDistM = computeDistanceMeters(startLat, startLng, targetLat, targetLng);
+      // Realistic pacing: 3.2s to 6.0s depending on 80km range
+      const durationMs = Math.min(6500, Math.max(2800, (initialDistM / 15000) * 1000 + 2400));
+      const startTime = performance.now();
 
-        const curLat = startLat + (endLat - startLat) * progress;
-        const curLng = startLng + (endLng - startLng) * progress;
+      const missileObj = {
+        id: id,
+        marker: missileMarker,
+        trail: trailLine,
+        type: missileType,
+        targetName: targetName,
+        targetUnitId: targetUnitId,
+        speedMach: speedMach,
+        hitProbability: hitProbability,
+        startLat: startLat,
+        startLng: startLng,
+        curLat: startLat,
+        curLng: startLng,
+        targetLat: targetLat,
+        targetLng: targetLng,
+        startTime: startTime,
+        durationMs: durationMs,
+        finished: false
+      };
+
+      activeMissiles[id] = missileObj;
+
+      // CLICK HANDLER: Open Tactical HUD Telemetry on Missile
+      missileMarker.on('click', function(e) {
+        L.DomEvent.stopPropagation(e);
+        const now = performance.now();
+        const elapsed = now - missileObj.startTime;
+        const etaSec = Math.max(0, (missileObj.durationMs - elapsed) / 1000);
+        const distRemainingKm = computeDistanceMeters(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng) / 1000;
+
+        const popupContent = `
+          <div style="background: rgba(10,16,28,0.96); border: 1.5px solid #00E5FF; border-radius: 6px; padding: 8px 11px; color: #FFF; font-family: sans-serif; font-size: 11px; min-width: 175px; box-shadow: 0 4px 20px rgba(0,229,255,0.45);">
+            <div style="font-weight: 900; color: #FF9F0A; font-size: 12px; margin-bottom: 4px;">🚀 ${missileTitle}</div>
+            <div style="color: #00E5FF; font-size: 9px; font-weight: bold; margin-bottom: 6px;">TERMINAL RADAR HOMING</div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+              <span style="color:#8E8E93;">Target:</span>
+              <span style="color:#FFF; font-weight:bold;">${targetName}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+              <span style="color:#8E8E93;">Speed:</span>
+              <span style="color:#00E5FF; font-weight:bold;">Mach ${speedMach.toFixed(1)}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+              <span style="color:#8E8E93;">Distance:</span>
+              <span style="color:#FFD600; font-weight:bold;">${distRemainingKm.toFixed(1)} km</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom: 2px;">
+              <span style="color:#8E8E93;">Impact ETA:</span>
+              <span style="color:#FF453A; font-weight:bold;">${etaSec.toFixed(1)}s</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+              <span style="color:#8E8E93;">Hit Prob P(k):</span>
+              <span style="color:#30D158; font-weight:bold;">${(hitProbability * 100).toFixed(0)}%</span>
+            </div>
+          </div>
+        `;
+
+        L.popup({ offset: [0, -14], closeButton: false, className: 'tactical-hud-popup' })
+          .setLatLng([missileObj.curLat, missileObj.curLng])
+          .setContent(popupContent)
+          .openOn(map);
+
+        if (window.AndroidBridge && window.AndroidBridge.onMissileClicked) {
+          window.AndroidBridge.onMissileClicked(
+            id,
+            missileType,
+            targetName,
+            speedMach,
+            etaSec,
+            hitProbability,
+            distRemainingKm
+          );
+        }
+      });
+
+      // Frame-by-frame Homing Step
+      function step(now) {
+        if (missileObj.finished) return;
+
+        const elapsed = now - missileObj.startTime;
+        const progress = Math.min(elapsed / missileObj.durationMs, 1.0);
+
+        // Dynamic Homing: update destination if target aircraft is moving!
+        if (missileObj.targetUnitId && unitsCache) {
+          const liveTarget = unitsCache.find(u => u.id === missileObj.targetUnitId);
+          if (liveTarget && liveTarget.position) {
+            missileObj.targetLat = liveTarget.position.lat;
+            missileObj.targetLng = liveTarget.position.lng;
+          }
+        }
+
+        const curLat = missileObj.startLat + (missileObj.targetLat - missileObj.startLat) * progress;
+        const curLng = missileObj.startLng + (missileObj.targetLng - missileObj.startLng) * progress;
+        missileObj.curLat = curLat;
+        missileObj.curLng = curLng;
+
+        // Dynamic heading towards destination
+        const dLat = missileObj.targetLat - curLat;
+        const dLng = missileObj.targetLng - curLng;
+        const headingDeg = (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
 
         missileMarker.setLatLng([curLat, curLng]);
+        const markerEl = missileMarker.getElement();
+        if (markerEl) {
+          const wrapper = markerEl.querySelector('.tactical-missile-marker');
+          if (wrapper) {
+            wrapper.style.transform = `rotate(${headingDeg}deg)`;
+          }
+        }
+
         trailLine.setLatLngs([
-          [startLat + (endLat - startLat) * Math.max(0, progress - 0.3), startLng + (endLng - startLng) * Math.max(0, progress - 0.3)],
+          [
+            missileObj.startLat + (missileObj.targetLat - missileObj.startLat) * Math.max(0, progress - 0.25),
+            missileObj.startLng + (missileObj.targetLng - missileObj.startLng) * Math.max(0, progress - 0.25)
+          ],
           [curLat, curLng]
         ]);
 
         if (progress < 1.0) {
           requestAnimationFrame(step);
         } else {
-          // Reached target: remove missile & line, trigger detonation shockwave
+          // Terminal Impact Reached!
+          missileObj.finished = true;
+          delete activeMissiles[id];
+
           map.removeLayer(missileMarker);
           map.removeLayer(trailLine);
 
-          const blastCircle = L.circle([endLat, endLng], {
-            radius: 8,
-            color: '#FFD600',
-            weight: 2,
-            fillColor: '#FF453A',
-            fillOpacity: 0.6
-          }).addTo(map);
-
-          let blastStep = 0;
-          const blastInterval = setInterval(() => {
-            blastStep++;
-            blastCircle.setRadius(8 + blastStep * 14);
-            blastCircle.setStyle({
-              opacity: Math.max(0, 0.8 - blastStep * 0.16),
-              fillOpacity: Math.max(0, 0.6 - blastStep * 0.12)
-            });
-            if (blastStep >= 5) {
-              clearInterval(blastInterval);
-              map.removeLayer(blastCircle);
-            }
-          }, 40);
+          // Trigger Detonation Blast & Supersonic Expanding Shockwave
+          triggerDetonationShockwave(missileObj.targetLat, missileObj.targetLng, missileObj);
         }
       }
 
       requestAnimationFrame(step);
+    };
+
+    // Detonation Blast & Expanding Shockwave Animation
+    function triggerDetonationShockwave(lat, lng, missileObj) {
+      if (!map) return;
+
+      // 1. Core Fireball Flash
+      const fireball = L.circle([lat, lng], {
+        radius: 12,
+        color: '#FFD600',
+        weight: 3,
+        fillColor: '#FFFFFF',
+        fillOpacity: 0.95
+      }).addTo(map);
+
+      // 2. High-Velocity Supersonic Shockwave Ring
+      const shockwave = L.circle([lat, lng], {
+        radius: 15,
+        color: '#00E5FF',
+        weight: 3.5,
+        fillColor: '#FF453A',
+        fillOpacity: 0.45
+      }).addTo(map);
+
+      // 3. Secondary Thermal Blast Ring
+      const secondaryWave = L.circle([lat, lng], {
+        radius: 8,
+        color: '#FF9F0A',
+        weight: 2,
+        fillColor: '#FF9F0A',
+        fillOpacity: 0.25
+      }).addTo(map);
+
+      let frame = 0;
+      const maxFrames = 14;
+      const animInterval = setInterval(() => {
+        frame++;
+        const progress = frame / maxFrames;
+
+        // Shockwaves expand rapidly across 200+ meters
+        shockwave.setRadius(15 + progress * 190);
+        shockwave.setStyle({
+          opacity: Math.max(0, 0.95 - progress * 0.9),
+          fillOpacity: Math.max(0, 0.45 - progress * 0.45),
+          weight: Math.max(1, 3.5 * (1 - progress))
+        });
+
+        secondaryWave.setRadius(8 + progress * 130);
+        secondaryWave.setStyle({
+          opacity: Math.max(0, 0.8 - progress * 0.8),
+          fillOpacity: Math.max(0, 0.25 - progress * 0.25)
+        });
+
+        fireball.setRadius(12 + progress * 35);
+        fireball.setStyle({
+          fillColor: progress < 0.4 ? '#FFFFFF' : '#FF453A',
+          opacity: Math.max(0, 0.9 - progress * 0.9),
+          fillOpacity: Math.max(0, 0.9 - progress * 0.9)
+        });
+
+        if (frame >= maxFrames) {
+          clearInterval(animInterval);
+          map.removeLayer(shockwave);
+          map.removeLayer(secondaryWave);
+          map.removeLayer(fireball);
+        }
+      }, 35);
+
+      // If targeting an aircraft and hit succeeds:
+      if (missileObj && missileObj.targetUnitId) {
+        if (Math.random() <= missileObj.hitProbability) {
+          if (window.AndroidBridge && window.AndroidBridge.onUnitShotDown) {
+            window.AndroidBridge.onUnitShotDown(missileObj.targetUnitId, missileObj.targetName);
+          }
+        }
+      }
+    }
+
+    // Backwards-compatible alias for simple calls
+    window.animateMissileLaunch = function(startLat, startLng, endLat, endLng, missileType) {
+      window.launchActiveMissile({
+        fromLat: startLat,
+        fromLng: startLng,
+        toLat: endLat,
+        toLng: endLng,
+        missileType: missileType
+      });
     };
 
     window.startSortieTargeting = function() {

@@ -33,6 +33,7 @@ class LocalGameState(private val context: Context) {
             speedMach: Double = 4.2,
             hitProbability: Double = 0.88
         )
+        fun onMarketUpdated(assets: List<MarketAsset>, holdings: Map<String, PortfolioHolding>)
     }
 
     var player: Player = Player()
@@ -44,12 +45,15 @@ class LocalGameState(private val context: Context) {
     val alliances: MutableList<AllianceItem> = mutableListOf()
     val treaties: MutableList<TreatyItem> = mutableListOf()
     val combatReports: MutableList<CombatReportItem> = mutableListOf()
+    val marketAssets: MutableMap<String, MarketAsset> = mutableMapOf()
+    val marketNews: MutableList<MarketNewsItem> = mutableListOf()
 
     private val listeners: MutableList<StateListener> = mutableListOf()
     private val handler = Handler(Looper.getMainLooper())
     private var incomeAccumulator: Double = 0.0
     private var hasInitialGpsFixed: Boolean = false
     private var tickCounter: Int = 0
+    private var marketTickCounter: Int = 0
     private val samCooldownMap = mutableMapOf<String, Long>()
 
     private val tickRunnable = object : Runnable {
@@ -88,6 +92,12 @@ class LocalGameState(private val context: Context) {
                     put("lng", player.position.lng)
                 }
                 put("position", pos)
+
+                val hArr = JSONArray()
+                player.holdings.values.forEach { h ->
+                    hArr.put(h.toJsonObject())
+                }
+                put("holdings", hArr)
             }
             root.put("player", pObj)
 
@@ -103,6 +113,12 @@ class LocalGameState(private val context: Context) {
                 uArr.put(u.toJsonObject())
             }
             root.put("activeUnits", uArr)
+
+            val mArr = JSONArray()
+            marketAssets.values.forEach { m ->
+                mArr.put(m.toJsonObject())
+            }
+            root.put("marketAssets", mArr)
 
             val file = File(context.filesDir, "world_cache.json")
             file.writeText(root.toString())
@@ -131,6 +147,39 @@ class LocalGameState(private val context: Context) {
                 if (pObj.has("position")) {
                     val posObj = pObj.getJSONObject("position")
                     player.position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng"))
+                }
+                if (pObj.has("holdings")) {
+                    player.holdings.clear()
+                    val hArr = pObj.getJSONArray("holdings")
+                    for (i in 0 until hArr.length()) {
+                        val hObj = hArr.getJSONObject(i)
+                        val h = PortfolioHolding(
+                            assetId = hObj.getString("assetId"),
+                            quantity = hObj.getInt("quantity"),
+                            totalInvested = hObj.optDouble("totalInvested", 0.0)
+                        )
+                        player.holdings[h.assetId] = h
+                    }
+                }
+            }
+
+            if (root.has("marketAssets")) {
+                val mArr = root.getJSONArray("marketAssets")
+                for (i in 0 until mArr.length()) {
+                    val mObj = mArr.getJSONObject(i)
+                    val id = mObj.getString("id")
+                    val asset = marketAssets[id]
+                    if (asset != null) {
+                        asset.currentPrice = mObj.optDouble("currentPrice", asset.basePrice)
+                        asset.changePercent = mObj.optDouble("changePercent", 0.0)
+                        if (mObj.has("priceHistory")) {
+                            asset.priceHistory.clear()
+                            val histArr = mObj.getJSONArray("priceHistory")
+                            for (h in 0 until histArr.length()) {
+                                asset.priceHistory.add(histArr.getDouble(h))
+                            }
+                        }
+                    }
                 }
             }
 
@@ -268,6 +317,7 @@ class LocalGameState(private val context: Context) {
         listener.onPlayerUpdated(player)
         listener.onStructuresUpdated(structures)
         listener.onUnitsUpdated(activeUnits)
+        listener.onMarketUpdated(marketAssets.values.toList(), player.holdings)
     }
 
     fun removeListener(listener: StateListener) {
@@ -359,6 +409,28 @@ class LocalGameState(private val context: Context) {
                     )
                 )
             }
+
+            if (catalogJson.has("marketAssets")) {
+                val mktArr = catalogJson.getJSONArray("marketAssets")
+                for (i in 0 until mktArr.length()) {
+                    val m = mktArr.getJSONObject(i)
+                    val basePrice = m.getDouble("basePrice")
+                    val asset = MarketAsset(
+                        id = m.getString("id"),
+                        symbol = m.getString("symbol"),
+                        name = m.getString("name"),
+                        type = m.getString("type"),
+                        category = m.getString("category"),
+                        basePrice = basePrice,
+                        currentPrice = basePrice,
+                        changePercent = 0.0,
+                        maxPriceChangePercent = m.optDouble("maxPriceChangePercent", 5.0),
+                        description = m.optString("description", "")
+                    )
+                    marketAssets[asset.id] = asset
+                }
+            }
+            seedMarketNews()
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -580,6 +652,12 @@ class LocalGameState(private val context: Context) {
         if (stateChanged) {
             listeners.forEach { it.onPlayerUpdated(player) }
             listeners.forEach { it.onStructuresUpdated(structures) }
+        }
+
+        // 4. Market dynamic tick (every 5 seconds)
+        marketTickCounter++
+        if (marketTickCounter % 5 == 0) {
+            updateMarketTick()
         }
     }
 
@@ -1494,12 +1572,134 @@ class LocalGameState(private val context: Context) {
             list.add(LeaderboardItem(5, "Major Briggs", "[SOL]", 650, "Rank: Tactical Major", "player"))
         } else {
             // Wealth
-            list.add(LeaderboardItem(1, player.callsign, player.allianceTag, player.calculateNetWorth(structures), "Net Worth: $%,d".format(player.calculateNetWorth(structures)), "player"))
+            list.add(LeaderboardItem(1, player.callsign, player.allianceTag, player.calculateNetWorth(structures, marketAssets), "Net Worth: $%,d".format(player.calculateNetWorth(structures, marketAssets)), "player"))
             list.add(LeaderboardItem(2, "Nexus Syndicate", "[NEX]", 112000, "12 Bases • 8 Air Wings", "alliance"))
             list.add(LeaderboardItem(3, "Solar Vanguard", "[SOL]", 84000, "8 Bases • 6 Air Wings", "alliance"))
             list.add(LeaderboardItem(4, "Aegis Coalition", "[AEG]", 62000, "6 Bases • 4 Air Wings", "alliance"))
             list.add(LeaderboardItem(5, "General Vane", "[NEX]", 48500, "Citadel Citadel L3", "player"))
         }
         return list
+    }
+
+    private fun seedMarketNews() {
+        if (marketNews.isNotEmpty()) return
+        marketNews.add(MarketNewsItem("Aegis Defence Corp awarded multi-sector theater SAM contract; demand surging.", impactAssetId = "stock_aegis", isPositive = true))
+        marketNews.add(MarketNewsItem("Harbor & Sons expands automated cargo shipping routes through neutral maritime corridors.", impactAssetId = "stock_harbor", isPositive = true))
+        marketNews.add(MarketNewsItem("SkyForge Aerospace commences flight trials for supersonic strike airframes.", impactAssetId = "stock_skyforge", isPositive = true))
+        marketNews.add(MarketNewsItem("Ironvale Mining reports rich vein extraction in contested frontier mountains.", impactAssetId = "stock_ironvale", isPositive = true))
+        marketNews.add(MarketNewsItem("Kerosene Jet Fuel reserves steady following strategic pipeline reactivation.", impactAssetId = "comm_fuel", isPositive = true))
+        marketNews.add(MarketNewsItem("Industrial Steel fabrication quotas increased to supply fortress construction.", impactAssetId = "comm_steel", isPositive = true))
+        marketNews.add(MarketNewsItem("Agricultural supply corridors secured; Grain commodity stabilized.", impactAssetId = "comm_grain", isPositive = true))
+    }
+
+    private fun updateMarketTick() {
+        var anyPriceChanged = false
+        marketAssets.values.forEach { asset ->
+            val meanReversionFactor = (asset.basePrice - asset.currentPrice) / (asset.basePrice * 4.0)
+            val randomFactor = (kotlin.random.Random.nextDouble(-1.0, 1.0) * (asset.maxPriceChangePercent / 100.0))
+            val totalDeltaPercent = (randomFactor + meanReversionFactor * 0.15).coerceIn(
+                -asset.maxPriceChangePercent / 100.0,
+                asset.maxPriceChangePercent / 100.0
+            )
+            val newPrice = (asset.currentPrice * (1.0 + totalDeltaPercent)).coerceIn(asset.basePrice * 0.25, asset.basePrice * 4.0)
+            val roundedPrice = Math.round(newPrice * 100.0) / 100.0
+
+            if (roundedPrice != asset.currentPrice) {
+                asset.currentPrice = roundedPrice
+                asset.changePercent = Math.round(((asset.currentPrice - asset.basePrice) / asset.basePrice * 100.0) * 10.0) / 10.0
+                asset.priceHistory.add(roundedPrice)
+                if (asset.priceHistory.size > 24) {
+                    asset.priceHistory.removeAt(0)
+                }
+                anyPriceChanged = true
+            }
+        }
+
+        if (marketTickCounter % 25 == 0 && marketAssets.isNotEmpty()) {
+            val randomAsset = marketAssets.values.random()
+            val isUp = randomAsset.changePercent >= 0
+            val headline = if (isUp) {
+                "${randomAsset.name} (${randomAsset.symbol}) trading robustly amidst expanding defense procurement."
+            } else {
+                "${randomAsset.name} (${randomAsset.symbol}) consolidates after heavy institutional liquidation."
+            }
+            marketNews.add(0, MarketNewsItem(headline = headline, impactAssetId = randomAsset.id, isPositive = isUp))
+            if (marketNews.size > 15) {
+                marketNews.removeAt(marketNews.size - 1)
+            }
+        }
+
+        if (anyPriceChanged) {
+            listeners.forEach { it.onMarketUpdated(marketAssets.values.toList(), player.holdings) }
+        }
+    }
+
+    fun executeMarketBuy(assetId: String, quantity: Int): Pair<Boolean, String> {
+        if (quantity <= 0) return Pair(false, "Quantity must be greater than zero.")
+        val asset = marketAssets[assetId] ?: return Pair(false, "Asset not found.")
+        val totalCost = (asset.currentPrice * quantity).toInt()
+
+        if (player.wealth < totalCost) {
+            return Pair(false, "Insufficient funds ($${player.wealth} < $$totalCost).")
+        }
+
+        player.wealth -= totalCost
+        val holding = player.holdings.getOrPut(assetId) { PortfolioHolding(assetId = assetId) }
+        holding.quantity += quantity
+        holding.totalInvested += (asset.currentPrice * quantity)
+
+        saveLocalWorld()
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onMarketUpdated(marketAssets.values.toList(), player.holdings)
+            it.onAlert("BUY EXECUTED", "Acquired $quantity ${asset.symbol} @ $${asset.currentPrice} (-$$totalCost)")
+        }
+        return Pair(true, "Successfully bought $quantity ${asset.symbol} for $${totalCost}.")
+    }
+
+    fun executeMarketSell(assetId: String, quantity: Int): Pair<Boolean, String> {
+        if (quantity <= 0) return Pair(false, "Quantity must be greater than zero.")
+        val asset = marketAssets[assetId] ?: return Pair(false, "Asset not found.")
+        val holding = player.holdings[assetId]
+        if (holding == null || holding.quantity < quantity) {
+            return Pair(false, "Insufficient holdings to liquidate (Owned: ${holding?.quantity ?: 0}).")
+        }
+
+        val proceeds = (asset.currentPrice * quantity).toInt()
+        val costBasisPortion = holding.avgCostBasis * quantity
+        holding.quantity -= quantity
+        holding.totalInvested = (holding.totalInvested - costBasisPortion).coerceAtLeast(0.0)
+
+        if (holding.quantity == 0) {
+            player.holdings.remove(assetId)
+        }
+
+        player.wealth += proceeds
+        saveLocalWorld()
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onMarketUpdated(marketAssets.values.toList(), player.holdings)
+            it.onAlert("SELL EXECUTED", "Liquidated $quantity ${asset.symbol} @ $${asset.currentPrice} (+$$proceeds)")
+        }
+        return Pair(true, "Successfully liquidated $quantity ${asset.symbol} for +$${proceeds}.")
+    }
+
+    fun getPortfolioValue(): Double {
+        return player.holdings.values.sumOf { h ->
+            (marketAssets[h.assetId]?.currentPrice ?: 0.0) * h.quantity
+        }
+    }
+
+    fun getTotalInvested(): Double {
+        return player.holdings.values.sumOf { it.totalInvested }
+    }
+
+    fun getTotalProfitLoss(): Double {
+        return getPortfolioValue() - getTotalInvested()
+    }
+
+    fun getTotalProfitLossPercent(): Double {
+        val inv = getTotalInvested()
+        return if (inv > 0) (getTotalProfitLoss() / inv) * 100.0 else 0.0
     }
 }

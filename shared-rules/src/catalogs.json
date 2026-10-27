@@ -5,59 +5,62 @@
       "name": "F-16 Falcon",
       "role": "Multirole Fighter",
       "speedMps": 220,
-      "rangeMeters": 15000,
+      "rangeMeters": 2800000,
       "damage": 60,
       "hp": 100,
       "cost": 900,
       "assetKey": "unit.jet_f16",
-      "description": "Fast multirole fighter capable of air defense and light strike missions."
+      "description": "Fast multirole fighter with 2,800km ferry range and 1,200km combat radius."
     },
     {
       "id": "jet_mirage2000",
       "name": "Mirage 2000",
       "role": "Interceptor / Strike",
       "speedMps": 240,
-      "rangeMeters": 12000,
+      "rangeMeters": 2600000,
       "damage": 55,
       "hp": 90,
       "cost": 850,
       "assetKey": "unit.jet_mirage2000",
-      "description": "High-altitude delta-wing interceptor with rapid scramble capability."
+      "description": "High-altitude delta-wing interceptor with 2,600km range and rapid scramble capability."
     },
     {
       "id": "jet_f15",
       "name": "F-15 Eagle",
       "role": "Air Superiority",
       "speedMps": 250,
-      "rangeMeters": 25000,
+      "rangeMeters": 3800000,
       "damage": 80,
       "hp": 120,
       "cost": 1200,
       "assetKey": "unit.jet_f15",
-      "description": "Heavy twin-engine air supremacy fighter with extended operational range."
+      "description": "Heavy twin-engine air supremacy fighter with massive 3,800km operational ferry range."
     },
     {
       "id": "jet_su27",
       "name": "Su-27 Flanker",
       "role": "Air Superiority",
       "speedMps": 240,
-      "rangeMeters": 24000,
+      "rangeMeters": 3500000,
       "damage": 75,
       "hp": 120,
       "cost": 1100,
       "assetKey": "unit.jet_su27",
-      "description": "Supermaneuverable long-range dogfighter designed for territorial defense."
+      "description": "Supermaneuverable long-range dogfighter with 3,500km range designed for theater dominance."
     },
     {
       "id": "jet_a10",
       "name": "A-10 Thunderbolt",
       "role": "Ground Attack",
       "speedMps": 150,
-      "rangeMeters": 10000,
+      "rangeMeters": 2200000,
       "damage": 110,
       "hp": 150,
       "cost": 800,
       "assetKey": "unit.jet_a10",
+      "description": "Armored close air support jet with 2,200km range and 30mm GAU-8 rotary cannon."
+    }
+  ],
       "description": "Armored close air support platform armed with heavy rotary cannon."
     }
   ],
@@ -65,8 +68,8 @@
     {
       "id": "int_short",
       "name": "Short-Range SAM",
-      "rangeMeters": 3000,
-      "hitChance": 0.60,
+      "rangeMeters": 15000,
+      "hitChance": 0.65,
       "cost": 150,
       "reloadSeconds": 15,
       "assetKey": "interceptor.int_short",
@@ -75,8 +78,8 @@
     {
       "id": "int_medium",
       "name": "Medium-Range SAM",
-      "rangeMeters": 8000,
-      "hitChance": 0.70,
+      "rangeMeters": 45000,
+      "hitChance": 0.75,
       "cost": 300,
       "reloadSeconds": 30,
       "assetKey": "interceptor.int_medium",
@@ -85,12 +88,22 @@
     {
       "id": "int_long",
       "name": "Long-Range SAM",
-      "rangeMeters": 20000,
-      "hitChance": 0.80,
+      "rangeMeters": 100000,
+      "hitChance": 0.95,
       "cost": 600,
       "reloadSeconds": 60,
       "assetKey": "interceptor.int_long",
-      "description": "Strategic theater air shield with high accuracy against incoming sorties."
+      "description": "Strategic theater air shield with high accuracy against incoming sorties (100 km BVR)."
+    },
+    {
+      "id": "msl_cruise_200",
+      "name": "BrahMos-ER Cruise Missile",
+      "rangeMeters": 200000,
+      "hitChance": 0.98,
+      "cost": 850,
+      "reloadSeconds": 45,
+      "assetKey": "interceptor.cruise",
+      "description": "Heavy strategic precision cruise missile with 200km theater range (Mach 0.85 flight)."
     }
   ],
   "groundUnits": [
@@ -117,6 +130,88 @@
       "cost": 450,
       "assetKey": "unit.tank",
       "description": "Light combat vehicle providing direct fire support against ground units."
+    }
+  ],
+  "marketAssets": [
+    {
+      "id": "comm_ore",
+      "symbol": "ORE",
+      "name": "Titanium Ore",
+      "type": "commodity",
+      "category": "Raw Materials",
+      "basePrice": 48.0,
+      "maxPriceChangePercent": 5.0,
+      "description": "Critical unrefined ore essential for titanium alloys and heavy armor plates."
+    },
+    {
+      "id": "comm_fuel",
+      "symbol": "FUEL",
+      "name": "Kerosene Jet Fuel",
+      "type": "commodity",
+      "category": "Energy",
+      "basePrice": 125.0,
+      "maxPriceChangePercent": 6.5,
+      "description": "Refined military JP-8 jet propellant powering supersonic fighter sorties."
+    },
+    {
+      "id": "comm_steel",
+      "symbol": "STEL",
+      "name": "Reinforced Steel",
+      "type": "commodity",
+      "category": "Industrial",
+      "basePrice": 210.0,
+      "maxPriceChangePercent": 4.5,
+      "description": "High-tensile structural steel required for missile silos and fortifications."
+    },
+    {
+      "id": "comm_grain",
+      "symbol": "GRAN",
+      "name": "Strategic Grain",
+      "type": "commodity",
+      "category": "Agriculture",
+      "basePrice": 36.0,
+      "maxPriceChangePercent": 3.5,
+      "description": "Agricultural food staple supporting expanding city populations."
+    },
+    {
+      "id": "stock_aegis",
+      "symbol": "AEGIS",
+      "name": "Aegis Defence Corp",
+      "type": "company",
+      "category": "Defense Contractor",
+      "basePrice": 460.0,
+      "maxPriceChangePercent": 7.0,
+      "description": "Tier-1 military contractor manufacturing SAM systems and radar arrays."
+    },
+    {
+      "id": "stock_skyforge",
+      "symbol": "SKFA",
+      "name": "SkyForge Aerospace",
+      "type": "company",
+      "category": "Aviation",
+      "basePrice": 625.0,
+      "maxPriceChangePercent": 8.0,
+      "description": "Aviation giant engineering supersonic multirole fighters and scramjets."
+    },
+    {
+      "id": "stock_harbor",
+      "symbol": "HBRS",
+      "name": "Harbor & Sons Shipping",
+      "type": "company",
+      "category": "Logistics",
+      "basePrice": 285.0,
+      "maxPriceChangePercent": 5.5,
+      "description": "Maritime logistics conglomerate dominating global trade sea corridors."
+    },
+    {
+      "id": "stock_ironvale",
+      "symbol": "IRNV",
+      "name": "Ironvale Mining",
+      "type": "company",
+      "category": "Mining & Metals",
+      "basePrice": 180.0,
+      "maxPriceChangePercent": 6.0,
+      "description": "Subterranean excavation syndicate controlling deep mineral veins."
     }
   ]
 }

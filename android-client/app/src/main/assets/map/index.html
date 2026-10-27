@@ -273,6 +273,7 @@
     let unitMarkers = {};
     let unitFlightPaths = {};
     let selectedJetId = null;
+    let isTrackingJet = false;
     let radarArcPolygon = null;
 
     let placementCircle = null;
@@ -351,6 +352,10 @@
               placementCircle.setLatLng(center);
             }
           }
+        });
+
+        map.on('dragstart', function() {
+          isTrackingJet = false;
         });
 
         if (window.AndroidBridge && window.AndroidBridge.onMapReady) {
@@ -547,6 +552,7 @@
     window.deselectAll = function() {
       selectedStructureId = null;
       selectedJetId = null;
+      isTrackingJet = false;
       if (selectedRadiusCircle && map) {
         map.removeLayer(selectedRadiusCircle);
         selectedRadiusCircle = null;
@@ -681,6 +687,7 @@
               L.DomEvent.stopPropagation(e);
               if (u.team === 'blue' || !u.team) {
                 selectedJetId = u.id;
+                isTrackingJet = true;
                 renderRadarCone(u);
               } else {
                 if (radarArcPolygon && map) {
@@ -763,9 +770,39 @@
           }
         }
       }
+
+      // 60FPS Silky Smooth Camera Tracking when aircraft is selected
+      if (isTrackingJet && selectedJetId && unitMarkers[selectedJetId] && map) {
+        const tracked = unitMarkers[selectedJetId];
+        if (tracked && tracked._curLat !== undefined) {
+          const curZoom = map.getZoom();
+          // Scale latitude offset relative to zoom so aircraft remains centered in upper 55% at ALL zoom levels
+          const latOffset = 0.0032 * Math.pow(2, 16 - curZoom);
+          map.setView([tracked._curLat - latOffset, tracked._curLng], curZoom, { animate: false });
+        }
+      }
+
       requestAnimationFrame(animateFlightPositions);
     }
     requestAnimationFrame(animateFlightPositions);
+
+    window.trackJet = function(jetId) {
+      selectedJetId = jetId;
+      isTrackingJet = true;
+      const u = unitsCache.find(item => item.id === jetId);
+      if (u && (u.team === 'blue' || !u.team)) {
+        renderRadarCone(u);
+      }
+    };
+
+    window.untrackJet = function() {
+      isTrackingJet = false;
+      selectedJetId = null;
+      if (radarArcPolygon && map) {
+        map.removeLayer(radarArcPolygon);
+        radarArcPolygon = null;
+      }
+    };
 
     function renderRadarCone(u) {
       if (!map) return;
@@ -1092,8 +1129,10 @@
 
     window.panToCoordinates = function(lat, lng, zoom, offsetForBottomCard) {
       if (!map) return;
-      // Offset latitude by -0.0032 degrees so target aircraft is displayed in the clear upper 55% of the viewport above the bottom dialog card!
-      const targetLat = offsetForBottomCard ? (lat - 0.0032) : lat;
+      const curZoom = zoom || map.getZoom();
+      // Dynamically scale latitude offset relative to zoom level
+      const latOffset = offsetForBottomCard ? (0.0032 * Math.pow(2, 16 - curZoom)) : 0;
+      const targetLat = lat - latOffset;
       if (zoom) {
         map.flyTo([targetLat, lng], zoom, { duration: 0.6 });
       } else {

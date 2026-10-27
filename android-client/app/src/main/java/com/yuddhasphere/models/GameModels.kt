@@ -32,10 +32,17 @@ data class Player(
     var allianceId: String? = null,
     var allianceRole: String = "Member",
     var xp: Int = 750,
-    var rank: String = "Captain (Grade II)"
+    var rank: String = "Captain (Grade II)",
+    val holdings: MutableMap<String, PortfolioHolding> = mutableMapOf()
 ) {
-    fun calculateNetWorth(structures: List<Structure>): Int {
-        return wealth + structures.sumOf { (it.level * 2500) + (it.hp * 2) }
+    fun calculateNetWorth(structures: List<Structure>, marketAssets: Map<String, MarketAsset> = emptyMap()): Int {
+        val structVal = structures.sumOf { (it.level * 2500) + (it.hp * 2) }
+        val portfolioVal = holdings.values.sumOf { h ->
+            val asset = marketAssets[h.assetId]
+            val price = asset?.currentPrice ?: 0.0
+            (h.quantity * price).toInt()
+        }
+        return wealth + structVal + portfolioVal
     }
 }
 
@@ -278,4 +285,66 @@ data class LeaderboardItem(
     val score: Int,
     val detail: String,
     val type: String // "player" or "alliance"
+)
+
+data class MarketAsset(
+    val id: String,
+    val symbol: String,
+    val name: String,
+    val type: String, // "commodity" or "company"
+    val category: String,
+    val basePrice: Double,
+    var currentPrice: Double = basePrice,
+    var changePercent: Double = 0.0,
+    val maxPriceChangePercent: Double = 5.0,
+    val description: String = "",
+    val priceHistory: MutableList<Double> = mutableListOf()
+) {
+    init {
+        if (priceHistory.isEmpty()) {
+            priceHistory.add(basePrice)
+        }
+    }
+
+    fun toJsonObject(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("symbol", symbol)
+            put("name", name)
+            put("type", type)
+            put("category", category)
+            put("basePrice", basePrice)
+            put("currentPrice", currentPrice)
+            put("changePercent", changePercent)
+            put("maxPriceChangePercent", maxPriceChangePercent)
+            put("description", description)
+            val histArr = JSONArray()
+            priceHistory.takeLast(24).forEach { histArr.put(it) }
+            put("priceHistory", histArr)
+        }
+    }
+}
+
+data class PortfolioHolding(
+    val assetId: String,
+    var quantity: Int = 0,
+    var totalInvested: Double = 0.0
+) {
+    val avgCostBasis: Double
+        get() = if (quantity > 0) totalInvested / quantity else 0.0
+
+    fun toJsonObject(): JSONObject {
+        return JSONObject().apply {
+            put("assetId", assetId)
+            put("quantity", quantity)
+            put("totalInvested", totalInvested)
+        }
+    }
+}
+
+data class MarketNewsItem(
+    val headline: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val impactAssetId: String? = null,
+    val isPositive: Boolean = true
 )

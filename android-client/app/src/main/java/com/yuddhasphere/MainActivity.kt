@@ -32,6 +32,7 @@ import com.yuddhasphere.models.UnitItem
 import com.yuddhasphere.network.GameClient
 import com.yuddhasphere.state.LocalGameState
 import com.yuddhasphere.ui.BuildMenuSheet
+import com.yuddhasphere.ui.MarketSheet
 import com.yuddhasphere.ui.MilitarySheet
 import com.yuddhasphere.ui.UnderProgressDialog
 import org.json.JSONObject
@@ -176,21 +177,32 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             showMilitarySheet()
         }
 
-        // Bottom Nav Item 3: Alliance (Full Screen Overlay)
+        // Bottom Nav Item 3: Market (GTX Global Tactical Exchange)
+        binding.navMarket.setOnClickListener {
+            hideAllCards()
+            MarketSheet(this, gameState).show()
+        }
+
+        // Bottom Nav Item 4: Alliance (Full Screen Overlay)
         binding.navAlliance.setOnClickListener {
             hideAllCards()
             showAllianceScreen()
         }
 
-        // Bottom Nav Item 4: Reports (24/7 Breaking War News Wire Overlay)
+        // Bottom Nav Item 5: Reports (24/7 Breaking War News Wire Overlay)
         binding.navReports.setOnClickListener {
             hideAllCards()
             showReportsScreen()
         }
 
-        // Bottom Nav Item 5: Menu (Settings & Server Nexus)
+        // Bottom Nav Item 6: Menu (Settings & Server Nexus)
         binding.navMenu.setOnClickListener {
             showCommanderRegistration()
+        }
+
+        // Wealth Details Button in Top HUD -> opens GTX Market & Portfolio
+        binding.btnWealthDetails.setOnClickListener {
+            MarketSheet(this, gameState).show()
         }
 
         // Recenter / Locate Me Button (in Top HUD)
@@ -275,10 +287,20 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
     private var pendingTargetingAirbaseId: String? = null
     private var pendingTargetingHangarJetId: String? = null
+    private var pendingTargetingCruiseSiloId: String? = null
+
+    private fun promptCruiseMissileTargeting(siloId: String) {
+        pendingTargetingCruiseSiloId = siloId
+        binding.sortieTargetingBar.visibility = View.VISIBLE
+        binding.bottomNavBar.visibility = View.GONE
+        binding.tvSortieHint.text = "🎯 Tap target on map (within 200km) to launch BrahMos-ER Cruise Missile"
+        binding.mapWebView.evaluateJavascript("window.startSortieTargeting();", null)
+    }
 
     private fun cancelSortieTargetingMode() {
         pendingTargetingAirbaseId = null
         pendingTargetingHangarJetId = null
+        pendingTargetingCruiseSiloId = null
         isRetargetingMode = false
         binding.sortieTargetingBar.visibility = View.GONE
         binding.bottomNavBar.visibility = View.VISIBLE
@@ -353,7 +375,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnCloseJetControl.setOnClickListener {
             binding.cardJetSortieControl.visibility = View.GONE
             activeSelectedJetId = null
-            binding.mapWebView.evaluateJavascript("window.deselectAll();", null)
+            binding.mapWebView.evaluateJavascript("window.untrackJet(); window.deselectAll();", null)
         }
 
         // Close Commander Profile
@@ -572,6 +594,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     private fun hideAllCards() {
+        if (activeSelectedJetId != null) {
+            binding.mapWebView.evaluateJavascript("window.untrackJet();", null)
+        }
         binding.cardStructureInspector.visibility = View.GONE
         binding.cardJetSortieControl.visibility = View.GONE
         binding.cardMissileTelemetry.visibility = View.GONE
@@ -633,7 +658,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         val cat = gameState.catalogBuildings[s.type]
         binding.tvInspectorIncome.text = if (cat != null && cat.incomePerHour > 0) "Income: +$${cat.incomePerHour}/hr" else "Income: $0/hr"
 
-        // Dynamic visual slots for Airbase Hangar & SAM Silos
+        // Dynamic visual slots for Airbase Hangar, SAM Silos & Missile Launcher Silos
         if (s.type == "airbase") {
             binding.layoutHangarSlots.visibility = View.VISIBLE
             binding.layoutSamSlots.visibility = View.GONE
@@ -642,6 +667,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             binding.layoutSamSlots.visibility = View.VISIBLE
             binding.layoutHangarSlots.visibility = View.GONE
             renderSamSlots(s)
+        } else if (s.type == "missile_silo") {
+            binding.layoutSamSlots.visibility = View.VISIBLE
+            binding.layoutHangarSlots.visibility = View.GONE
+            renderMissileSiloSlots(s)
         } else {
             binding.layoutHangarSlots.visibility = View.GONE
             binding.layoutSamSlots.visibility = View.GONE
@@ -837,9 +866,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 }
                 val tvRange = android.widget.TextView(this).apply {
-                    text = "Range: 2,500m"
+                    text = "Patriot PAC-3 • 100km"
                     setTextColor(Color.parseColor("#8E8E93"))
-                    textSize = 9f
+                    textSize = 8.5f
                 }
 
                 siloCard.addView(tvTitle)
@@ -884,13 +913,124 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         }
     }
 
+    private fun renderMissileSiloSlots(s: Structure) {
+        binding.containerSamSlots.removeAllViews()
+        val maxSlots = s.maxMissileSlots()
+        binding.tvSamHeader.text = "🚀 STRATEGIC CRUISE MISSILE SILOS (${s.missileMunitions}/$maxSlots ARMED)"
+
+        for (i in 0 until maxSlots) {
+            val siloCard = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                val params = android.widget.LinearLayout.LayoutParams(
+                    (135 * resources.displayMetrics.density).toInt(),
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginEnd = (8 * resources.displayMetrics.density).toInt()
+                }
+                layoutParams = params
+                setPadding(
+                    (8 * resources.displayMetrics.density).toInt(),
+                    (8 * resources.displayMetrics.density).toInt(),
+                    (8 * resources.displayMetrics.density).toInt(),
+                    (8 * resources.displayMetrics.density).toInt()
+                )
+            }
+
+            if (i < s.missileMunitions) {
+                siloCard.setBackgroundResource(R.drawable.bg_slot_occupied)
+
+                val tvTitle = android.widget.TextView(this).apply {
+                    text = "SILO #${i + 1} • BRAHMOS"
+                    setTextColor(Color.WHITE)
+                    textSize = 10.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+                val tvStatus = android.widget.TextView(this).apply {
+                    text = "ARMED & READY"
+                    setTextColor(Color.parseColor("#30D158"))
+                    textSize = 9.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+                val tvRange = android.widget.TextView(this).apply {
+                    text = "Range: 200km • Mach 0.85"
+                    setTextColor(Color.parseColor("#8E8E93"))
+                    textSize = 8.5f
+                }
+                val btnLaunch = android.widget.Button(this).apply {
+                    text = "🎯 TARGET LAUNCH"
+                    textSize = 9.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(Color.parseColor("#070B14"))
+                    setBackgroundResource(R.drawable.bg_accent_button)
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        (32 * resources.displayMetrics.density).toInt()
+                    ).apply {
+                        topMargin = (6 * resources.displayMetrics.density).toInt()
+                    }
+                    setOnClickListener {
+                        binding.cardStructureInspector.visibility = View.GONE
+                        promptCruiseMissileTargeting(s.id)
+                    }
+                }
+
+                siloCard.addView(tvTitle)
+                siloCard.addView(tvStatus)
+                siloCard.addView(tvRange)
+                siloCard.addView(btnLaunch)
+            } else {
+                siloCard.setBackgroundResource(R.drawable.bg_slot_empty)
+
+                val tvTitle = android.widget.TextView(this).apply {
+                    text = "SILO #${i + 1} (EMPTY)"
+                    setTextColor(Color.parseColor("#FF9F0A"))
+                    textSize = 10.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                }
+                val tvDesc = android.widget.TextView(this).apply {
+                    text = "BrahMos-ER Cruise"
+                    setTextColor(Color.parseColor("#8E8E93"))
+                    textSize = 8.5f
+                }
+                val btnArm = android.widget.Button(this).apply {
+                    text = "RELOAD ($850)"
+                    textSize = 9.5f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    setTextColor(Color.parseColor("#FF9F0A"))
+                    setBackgroundResource(R.drawable.bg_secondary_button)
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        (32 * resources.displayMetrics.density).toInt()
+                    ).apply {
+                        topMargin = (6 * resources.displayMetrics.density).toInt()
+                    }
+                    setOnClickListener {
+                        val result = gameState.reloadMissileSilo(s.id)
+                        if (result.first) {
+                            renderMissileSiloSlots(s)
+                        } else {
+                            Toast.makeText(this@MainActivity, result.second, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+
+                siloCard.addView(tvTitle)
+                siloCard.addView(tvDesc)
+                siloCard.addView(btnArm)
+            }
+
+            binding.containerSamSlots.addView(siloCard)
+        }
+    }
+
     private fun showJetSortieControl(jetId: String) {
         val u = gameState.activeUnits.find { it.id == jetId } ?: return
         hideAllCards()
         activeSelectedJetId = jetId
         binding.cardJetSortieControl.visibility = View.VISIBLE
-        // Offset latitude by -0.0032 so aircraft stays nicely positioned above the bottom control card
+        // Offset latitude so aircraft stays centered nicely above the bottom control card
         binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5, true);", null)
+        binding.mapWebView.evaluateJavascript("window.trackJet('${jetId}');", null)
 
         binding.tvJetControlTitle.text = "${u.name} (Sortie)"
         binding.tvJetCommanderCallsign.text = "PILOT: ${u.ownerCallsign.ifEmpty { "Commander" }}"
@@ -1109,6 +1249,16 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onSortieTargetPicked(lat: Double, lng: Double, targetStructureId: String) {
+        if (pendingTargetingCruiseSiloId != null) {
+            val siloId = pendingTargetingCruiseSiloId!!
+            cancelSortieTargetingMode()
+            val result = gameState.fireCruiseMissile(siloId, GeoPoint(lat, lng))
+            if (!result.first) {
+                Toast.makeText(this, result.second, Toast.LENGTH_SHORT).show()
+            }
+            return
+        }
+
         if (isRetargetingMode) {
             val jetId = activeSelectedJetId ?: return
             isRetargetingMode = false
@@ -1153,6 +1303,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                     renderHangarSlots(s)
                 } else if (s.type == "sam") {
                     renderSamSlots(s)
+                } else if (s.type == "missile_silo") {
+                    renderMissileSiloSlots(s)
                 }
             }
         }
@@ -1162,11 +1314,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         if (isMapReady) {
             syncUnitsToMap()
         }
-        // Smoothly follow moving aircraft in real time if selected
+        // Smoothly update aircraft HUD in real time if selected
         activeSelectedJetId?.let { id ->
             val u = units.find { it.id == id }
             if (u != null) {
-                binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, null, true);", null)
                 val fuel = u.fuelPercent.toInt()
                 binding.tvJetFuelPercent.text = "$fuel%"
                 binding.pbJetFuel.progress = fuel
@@ -1181,6 +1332,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 binding.cardJetSortieControl.visibility = View.GONE
             }
         }
+    }
+
+    override fun onMarketUpdated(assets: List<com.yuddhasphere.models.MarketAsset>, holdings: Map<String, com.yuddhasphere.models.PortfolioHolding>) {
+        // Market tick processed authoritatively
     }
 
     override fun onAlert(title: String, message: String) {

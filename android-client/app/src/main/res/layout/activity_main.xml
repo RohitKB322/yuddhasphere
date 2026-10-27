@@ -1619,7 +1619,7 @@
         android:elevation="12dp"
         android:gravity="center"
         android:orientation="horizontal"
-        android:weightSum="5"
+        android:weightSum="6"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -1649,7 +1649,7 @@
                 android:fontFamily="sans-serif-bold"
                 android:text="Build"
                 android:textColor="@color/primary_neon"
-                android:textSize="11sp" />
+                android:textSize="10.5sp" />
         </LinearLayout>
 
         <!-- 2. MILITARY -->
@@ -1677,7 +1677,35 @@
                 android:fontFamily="sans-serif-medium"
                 android:text="Military"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textSize="10.5sp" />
+        </LinearLayout>
+
+        <!-- 3. MARKET (GTX EXCHANGE) -->
+        <LinearLayout
+            android:id="@+id/navMarket"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_market"
+                android:contentDescription="Market" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="Market"
+                android:textColor="@color/text_secondary"
+                android:textSize="10.5sp" />
         </LinearLayout>
 
         <!-- 3. ALLIANCE -->

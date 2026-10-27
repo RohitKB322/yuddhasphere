@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_glass_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="10dp">
+
+    <!-- SYMBOL BADGE -->
+    <TextView
+        android:id="@+id/tvAssetSymbol"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/bg_secondary_button"
+        android:fontFamily="sans-serif-black"
+        android:gravity="center"
+        android:text="ORE"
+        android:textColor="@color/accent_cyan"
+        android:textSize="12sp" />
+
+    <!-- INFO COLUMN -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvAssetName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-black"
+            android:maxLines="1"
+            android:text="Titanium Ore"
+            android:textColor="@color/white"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvAssetCategory"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Raw Materials • Commodity"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/tvAssetHoldings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="Holdings: 0"
+            android:textColor="@color/accent_orange"
+            android:textSize="9.5sp"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- SPARKLINE CHART -->
+    <com.yuddhasphere.ui.SparklineView
+        android:id="@+id/sparklineView"
+        android:layout_width="65dp"
+        android:layout_height="32dp"
+        android:layout_marginHorizontal="6dp" />
+
+    <!-- PRICE & CHANGE COLUMN -->
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvAssetPrice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-black"
+            android:text="$48.00"
+            android:textColor="@color/white"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/tvAssetChange"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:background="@drawable/bg_pill_stat"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="1.5dp"
+            android:text="+0.0%"
+            android:textColor="@color/accent_green"
+            android:textSize="9.5sp" />
+    </LinearLayout>
+
+    <!-- TRADE ACTION BUTTON -->
+    <Button
+        android:id="@+id/btnTradeAsset"
+        android:layout_width="56dp"
+        android:layout_height="34dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/bg_accent_button"
+        android:fontFamily="sans-serif-black"
+        android:text="TRADE"
+        android:textColor="@color/bg_tactical_dark"
+        android:textSize="10sp" />
+
+</LinearLayout>

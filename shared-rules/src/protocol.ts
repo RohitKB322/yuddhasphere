@@ -9,6 +9,8 @@ export type ClientCommand =
   | { type: 'RepairStructure'; structureId: string }
   | { type: 'BuyItem'; structureId: string; catalogId: string }
   | { type: 'LaunchSortie'; airbaseId: string; unitId: string; targetLat: number; targetLng: number }
+  | { type: 'LaunchMissile'; siloId: string; missileType: string; targetLat: number; targetLng: number }
+  | { type: 'DropBomb'; unitId: string; targetLat: number; targetLng: number }
   | { type: 'CreateAlliance'; name: string; tag: string; motto?: string; colorHex?: string }
   | { type: 'JoinAlliance'; allianceId: string }
   | { type: 'LeaveAlliance' }
@@ -32,5 +34,27 @@ export type ServerMessage =
   | { type: 'AllianceUpdate'; alliance: Alliance | null; members?: Player[]; treaties?: Treaty[] }
   | { type: 'ReportsUpdate'; reports: CombatReport[] }
   | { type: 'LeaderboardSync'; entries: LeaderboardEntry[]; metric: string }
+  | {
+      type: 'MissileLaunched';
+      missileId: string;
+      siloId: string;
+      missileType: string;
+      fromLat: number;
+      fromLng: number;
+      toLat: number;
+      toLng: number;
+      speedMach: number;
+      flightDurationSeconds: number;
+    }
+  | {
+      type: 'BombDropped';
+      bombId: string;
+      unitId: string;
+      fromLat: number;
+      fromLng: number;
+      toLat: number;
+      toLng: number;
+      flightDurationSeconds: number;
+    }
   | { type: 'Alert'; level: 'info' | 'warn' | 'danger'; text: string; location?: GeoPoint }
   | { type: 'Error'; code: string; message: string };

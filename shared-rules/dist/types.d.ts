@@ -22,7 +22,7 @@ export interface Player {
     protectionExpiresAt?: number;
     bannedState: 'none' | 'warned' | 'temp_ban' | 'perm_ban';
 }
-export type StructureType = 'village' | 'town' | 'city' | 'metropolis' | 'town_hall' | 'barracks' | 'airbase' | 'port' | 'mine' | 'sam' | 'radar' | 'wall';
+export type StructureType = 'village' | 'town' | 'city' | 'metropolis' | 'town_hall' | 'barracks' | 'airbase' | 'port' | 'mine' | 'sam' | 'radar' | 'wall' | 'missile_silo';
 export interface Structure {
     id: string;
     ownerId: string;
@@ -57,6 +57,8 @@ export interface Structure {
         status: string;
     }>;
     samMunitions?: number;
+    missileMunitions?: number;
+    equippedMissiles?: string[];
 }
 export interface Unit {
     id: string;

@@ -11,6 +11,16 @@ class DatabaseManager {
     colAlliances = null;
     colTreaties = null;
     colReports = null;
+    // In-Memory Dirty Write-Behind Buffer (Zero-latency to live game loop)
+    dirtyPlayers = new Map();
+    dirtyStructures = new Map();
+    dirtyAlliances = new Map();
+    dirtyTreaties = new Map();
+    dirtyReports = [];
+    removedStructureIds = new Set();
+    removedAllianceIds = new Set();
+    isFlushing = false;
+    flushTimer = null;
     async connect(uri) {
         const mongoUri = uri || process.env.MONGODB_URI;
         if (!mongoUri) {
@@ -21,7 +31,8 @@ class DatabaseManager {
             console.log('[Database] Connecting to MongoDB Atlas...');
             this.client = new mongodb_1.MongoClient(mongoUri, {
                 serverSelectionTimeoutMS: 5000,
-                connectTimeoutMS: 10000
+                connectTimeoutMS: 10000,
+                maxPoolSize: 10 // Lean connection pool tailored for free tier
             });
             await this.client.connect();
             this.db = this.client.db('yuddhasphere');
@@ -31,7 +42,15 @@ class DatabaseManager {
             this.colTreaties = this.db.collection('treaties');
             this.colReports = this.db.collection('reports');
             this.isConnected = true;
-            console.log('[Database] Connected successfully to MongoDB Atlas! Permanent persistence ACTIVE.');
+            console.log('[Database] Connected successfully to MongoDB Atlas! Asynchronous write-behind persistence ACTIVE.');
+            // Start automatic debounced flush every 20 seconds
+            if (!this.flushTimer) {
+                this.flushTimer = setInterval(() => {
+                    this.flushDirty().catch(err => {
+                        console.error('[Database] Background flush error:', err.message);
+                    });
+                }, 20000);
+            }
             return true;
         }
         catch (err) {
@@ -89,102 +108,203 @@ class DatabaseManager {
             return false;
         }
     }
-    async savePlayer(player) {
+    // Buffers updates in memory (instant 0ms latency to caller)
+    savePlayer(player) {
+        this.dirtyPlayers.set(player.id, { ...player });
+    }
+    saveStructure(structure) {
+        this.dirtyStructures.set(structure.id, { ...structure });
+        this.removedStructureIds.delete(structure.id);
+    }
+    removeStructure(structureId) {
+        this.dirtyStructures.delete(structureId);
+        this.removedStructureIds.add(structureId);
+    }
+    saveAlliance(alliance) {
+        this.dirtyAlliances.set(alliance.id, { ...alliance });
+        this.removedAllianceIds.delete(alliance.id);
+    }
+    removeAlliance(allianceId) {
+        this.dirtyAlliances.delete(allianceId);
+        this.removedAllianceIds.add(allianceId);
+    }
+    saveTreaty(treaty) {
+        this.dirtyTreaties.set(treaty.id, { ...treaty });
+    }
+    saveReport(report) {
+        this.dirtyReports.push({ ...report });
+    }
+    // Flushes an individual player immediately (e.g. on disconnect)
+    async flushPlayerImmediate(playerId, player) {
         if (!this.isConnected || !this.colPlayers)
             return;
-        try {
-            await this.colPlayers.updateOne({ id: player.id }, { $set: player }, { upsert: true });
-        }
-        catch (err) {
-            console.error(`[Database] Error saving player ${player.callsign}:`, err.message);
-        }
-    }
-    async saveStructure(structure) {
-        if (!this.isConnected || !this.colStructures)
+        const p = player || this.dirtyPlayers.get(playerId);
+        if (!p)
             return;
+        this.dirtyPlayers.delete(playerId);
         try {
-            await this.colStructures.updateOne({ id: structure.id }, { $set: structure }, { upsert: true });
+            await this.colPlayers.updateOne({ id: p.id }, { $set: p }, { upsert: true });
         }
         catch (err) {
-            console.error(`[Database] Error saving structure ${structure.id}:`, err.message);
+            console.error(`[Database] Error saving player ${playerId}:`, err.message);
         }
     }
-    async removeStructure(structureId) {
-        if (!this.isConnected || !this.colStructures)
+    // Non-blocking bulk write-behind
+    async flushDirty() {
+        if (!this.isConnected || this.isFlushing)
             return;
-        try {
-            await this.colStructures.deleteOne({ id: structureId });
-        }
-        catch (err) {
-            console.error(`[Database] Error deleting structure ${structureId}:`, err.message);
-        }
-    }
-    async saveAlliance(alliance) {
-        if (!this.isConnected || !this.colAlliances)
+        const totalDirty = this.dirtyPlayers.size +
+            this.dirtyStructures.size +
+            this.removedStructureIds.size +
+            this.dirtyAlliances.size +
+            this.removedAllianceIds.size +
+            this.dirtyTreaties.size +
+            this.dirtyReports.length;
+        if (totalDirty === 0)
             return;
+        this.isFlushing = true;
+        // Take shallow snapshots and clear dirty buffers
+        const playersToFlush = Array.from(this.dirtyPlayers.values());
+        this.dirtyPlayers.clear();
+        const structuresToFlush = Array.from(this.dirtyStructures.values());
+        this.dirtyStructures.clear();
+        const removedStructures = Array.from(this.removedStructureIds.values());
+        this.removedStructureIds.clear();
+        const alliancesToFlush = Array.from(this.dirtyAlliances.values());
+        this.dirtyAlliances.clear();
+        const removedAlliances = Array.from(this.removedAllianceIds.values());
+        this.removedAllianceIds.clear();
+        const treatiesToFlush = Array.from(this.dirtyTreaties.values());
+        this.dirtyTreaties.clear();
+        const reportsToFlush = [...this.dirtyReports];
+        this.dirtyReports = [];
         try {
-            await this.colAlliances.updateOne({ id: alliance.id }, { $set: alliance }, { upsert: true });
+            // 1. Bulk write players
+            if (playersToFlush.length > 0 && this.colPlayers) {
+                const ops = playersToFlush.map(p => ({
+                    updateOne: {
+                        filter: { id: p.id },
+                        update: { $set: p },
+                        upsert: true
+                    }
+                }));
+                await this.colPlayers.bulkWrite(ops, { ordered: false });
+            }
+            // 2. Bulk write structures (updates + deletes)
+            if ((structuresToFlush.length > 0 || removedStructures.length > 0) && this.colStructures) {
+                const ops = structuresToFlush.map(s => ({
+                    updateOne: {
+                        filter: { id: s.id },
+                        update: { $set: s },
+                        upsert: true
+                    }
+                }));
+                removedStructures.forEach(id => {
+                    ops.push({
+                        deleteOne: {
+                            filter: { id }
+                        }
+                    });
+                });
+                if (ops.length > 0) {
+                    await this.colStructures.bulkWrite(ops, { ordered: false });
+                }
+            }
+            // 3. Bulk write alliances
+            if ((alliancesToFlush.length > 0 || removedAlliances.length > 0) && this.colAlliances) {
+                const ops = alliancesToFlush.map(a => ({
+                    updateOne: {
+                        filter: { id: a.id },
+                        update: { $set: a },
+                        upsert: true
+                    }
+                }));
+                removedAlliances.forEach(id => {
+                    ops.push({
+                        deleteOne: {
+                            filter: { id }
+                        }
+                    });
+                });
+                if (ops.length > 0) {
+                    await this.colAlliances.bulkWrite(ops, { ordered: false });
+                }
+            }
+            // 4. Bulk write treaties
+            if (treatiesToFlush.length > 0 && this.colTreaties) {
+                const ops = treatiesToFlush.map(t => ({
+                    updateOne: {
+                        filter: { id: t.id },
+                        update: { $set: t },
+                        upsert: true
+                    }
+                }));
+                await this.colTreaties.bulkWrite(ops, { ordered: false });
+            }
+            // 5. Bulk write reports
+            if (reportsToFlush.length > 0 && this.colReports) {
+                const ops = reportsToFlush.map(r => ({
+                    updateOne: {
+                        filter: { id: r.id },
+                        update: { $set: r },
+                        upsert: true
+                    }
+                }));
+                await this.colReports.bulkWrite(ops, { ordered: false });
+            }
         }
         catch (err) {
-            console.error(`[Database] Error saving alliance ${alliance.tag}:`, err.message);
+            console.error('[Database] Background bulkWrite error:', err.message);
+        }
+        finally {
+            this.isFlushing = false;
         }
     }
-    async removeAlliance(allianceId) {
-        if (!this.isConnected || !this.colAlliances)
-            return;
-        try {
-            await this.colAlliances.deleteOne({ id: allianceId });
-        }
-        catch (err) {
-            console.error(`[Database] Error deleting alliance ${allianceId}:`, err.message);
-        }
-    }
-    async saveTreaty(treaty) {
-        if (!this.isConnected || !this.colTreaties)
-            return;
-        try {
-            await this.colTreaties.updateOne({ id: treaty.id }, { $set: treaty }, { upsert: true });
-        }
-        catch (err) {
-            console.error(`[Database] Error saving treaty ${treaty.id}:`, err.message);
-        }
-    }
-    async saveReport(report) {
-        if (!this.isConnected || !this.colReports)
-            return;
-        try {
-            await this.colReports.updateOne({ id: report.id }, { $set: report }, { upsert: true });
-        }
-        catch (err) {
-            console.error(`[Database] Error saving report ${report.id}:`, err.message);
-        }
-    }
+    // Periodic or bootstrap full snapshot using bulkWrite
     async saveFullWorld(world) {
         if (!this.isConnected)
             return;
         try {
             const players = Object.values(world.state.players);
-            for (const p of players) {
-                await this.savePlayer(p);
+            if (players.length > 0 && this.colPlayers) {
+                const ops = players.map(p => ({
+                    updateOne: { filter: { id: p.id }, update: { $set: p }, upsert: true }
+                }));
+                await this.colPlayers.bulkWrite(ops, { ordered: false });
             }
             const structures = Object.values(world.state.structures);
-            for (const s of structures) {
-                await this.saveStructure(s);
+            if (structures.length > 0 && this.colStructures) {
+                const ops = structures.map(s => ({
+                    updateOne: { filter: { id: s.id }, update: { $set: s }, upsert: true }
+                }));
+                await this.colStructures.bulkWrite(ops, { ordered: false });
             }
             const alliances = world.alliances.getAlliances();
-            for (const a of alliances) {
-                await this.saveAlliance(a);
+            if (alliances.length > 0 && this.colAlliances) {
+                const ops = alliances.map(a => ({
+                    updateOne: { filter: { id: a.id }, update: { $set: a }, upsert: true }
+                }));
+                await this.colAlliances.bulkWrite(ops, { ordered: false });
             }
             const treaties = world.alliances.getTreaties();
-            for (const t of treaties) {
-                await this.saveTreaty(t);
+            if (treaties.length > 0 && this.colTreaties) {
+                const ops = treaties.map(t => ({
+                    updateOne: { filter: { id: t.id }, update: { $set: t }, upsert: true }
+                }));
+                await this.colTreaties.bulkWrite(ops, { ordered: false });
             }
         }
         catch (err) {
-            console.error('[Database] Periodic full save error:', err.message);
+            console.error('[Database] Full snapshot bulk save error:', err.message);
         }
     }
     async close() {
+        if (this.flushTimer) {
+            clearInterval(this.flushTimer);
+            this.flushTimer = null;
+        }
+        // Flush any pending dirty writes before closing
+        await this.flushDirty();
         if (this.client) {
             await this.client.close();
             this.isConnected = false;

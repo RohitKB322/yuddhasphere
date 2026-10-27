@@ -100,8 +100,16 @@ class GameClient(
                                         radiusType = sObj.optString("radiusType", "influence"),
                                         online = sObj.optBoolean("online", true),
                                         upgradeFinishedAt = if (sObj.has("upgradeFinishedAt") && !sObj.isNull("upgradeFinishedAt")) sObj.getLong("upgradeFinishedAt") else null,
-                                        samMunitions = sObj.optInt("samMunitions", 6)
+                                        samMunitions = sObj.optInt("samMunitions", 6),
+                                        missileMunitions = sObj.optInt("missileMunitions", 4)
                                     )
+                                    if (sObj.has("equippedMissiles")) {
+                                        val mArr = sObj.getJSONArray("equippedMissiles")
+                                        s.equippedMissiles.clear()
+                                        for (m in 0 until mArr.length()) {
+                                            s.equippedMissiles.add(mArr.getString(m))
+                                        }
+                                    }
                                     if (sObj.has("hangarJets")) {
                                         val jArr = sObj.getJSONArray("hangarJets")
                                         for (k in 0 until jArr.length()) {
@@ -289,6 +297,38 @@ class GameClient(
             put("assetId", assetId)
             put("action", if (isBuy) "BUY" else "SELL")
             put("quantity", quantity)
+        }
+        send(json)
+    }
+
+    fun sendLaunchSortie(airbaseId: String, unitId: String, targetLat: Double, targetLng: Double) {
+        val json = JSONObject().apply {
+            put("type", "LaunchSortie")
+            put("airbaseId", airbaseId)
+            put("unitId", unitId)
+            put("targetLat", targetLat)
+            put("targetLng", targetLng)
+        }
+        send(json)
+    }
+
+    fun sendLaunchMissile(siloId: String, missileType: String, targetLat: Double, targetLng: Double) {
+        val json = JSONObject().apply {
+            put("type", "LaunchMissile")
+            put("siloId", siloId)
+            put("missileType", missileType)
+            put("targetLat", targetLat)
+            put("targetLng", targetLng)
+        }
+        send(json)
+    }
+
+    fun sendDropBomb(unitId: String, targetLat: Double, targetLng: Double) {
+        val json = JSONObject().apply {
+            put("type", "DropBomb")
+            put("unitId", unitId)
+            put("targetLat", targetLat)
+            put("targetLng", targetLng)
         }
         send(json)
     }

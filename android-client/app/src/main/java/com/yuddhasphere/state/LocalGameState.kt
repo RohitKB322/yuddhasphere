@@ -366,10 +366,14 @@ class LocalGameState(private val context: Context) {
         player.hp = srvPlayer.hp
         if (srvStructures.isNotEmpty()) {
             srvStructures.forEach { srvS ->
-                if (srvS.hangarJets.isEmpty()) {
-                    val local = structures.find { it.id == srvS.id }
-                    if (local != null && local.hangarJets.isNotEmpty()) {
+                val local = structures.find { it.id == srvS.id }
+                if (local != null) {
+                    if (srvS.hangarJets.isEmpty() && local.hangarJets.isNotEmpty()) {
                         srvS.hangarJets.addAll(local.hangarJets)
+                    }
+                    if (srvS.equippedMissiles.isEmpty() && local.equippedMissiles.isNotEmpty()) {
+                        srvS.equippedMissiles.addAll(local.equippedMissiles)
+                        srvS.missileMunitions = local.missileMunitions
                     }
                 }
             }
@@ -1058,6 +1062,7 @@ class LocalGameState(private val context: Context) {
             it.onUnitsUpdated(activeUnits)
             it.onAlert("Sortie Scrambled!", "${jet.name} launched on ${order.uppercase()} mission!")
         }
+        saveLocalWorld()
         return Pair(true, "Sortie scrambled.")
     }
 

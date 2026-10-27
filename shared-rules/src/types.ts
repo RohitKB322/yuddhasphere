@@ -37,7 +37,8 @@ export type StructureType =
   | 'mine'
   | 'sam'
   | 'radar'
-  | 'wall';
+  | 'wall'
+  | 'missile_silo';
 
 export interface Structure {
   id: string;
@@ -70,6 +71,8 @@ export interface Structure {
     status: string;
   }>;
   samMunitions?: number;
+  missileMunitions?: number;
+  equippedMissiles?: string[];
 }
 
 export interface Unit {

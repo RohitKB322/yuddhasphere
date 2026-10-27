@@ -65,6 +65,7 @@ const buildingCosts = {
     port: { cost: 1200, income: 100 },
     mine: { cost: 500, income: 120 },
     sam: { cost: 900, income: 0 },
+    missile_silo: { cost: 2200, income: 0 },
     radar: { cost: 750, income: 0 },
     wall: { cost: 150, income: 0 }
 };
@@ -103,6 +104,12 @@ wss.on('connection', (ws) => {
         const playerId = clients.get(ws);
         if (playerId) {
             console.log(`[Server] Client disconnected: ${playerId}`);
+            const player = world.getPlayer(playerId);
+            if (player) {
+                player.isOnline = false;
+                player.lastActive = Date.now();
+                db_1.dbManager.flushPlayerImmediate(playerId, player);
+            }
             clients.delete(ws);
         }
     });
@@ -208,7 +215,9 @@ function handleCommand(ws, command) {
                 createdAt: Date.now(),
                 slots: { storedUnits: [], queue: [] },
                 hangarJets: [],
-                samMunitions: command.structureType === 'sam' ? 6 : 0
+                samMunitions: command.structureType === 'sam' ? 6 : 0,
+                missileMunitions: command.structureType === 'missile_silo' ? 4 : 0,
+                equippedMissiles: command.structureType === 'missile_silo' ? ['missile_ballistic', 'missile_cruise', 'missile_hypersonic', 'missile_cluster'] : []
             };
             world.addStructure(newStructure);
             if (player) {
@@ -452,5 +461,80 @@ function handleCommand(ws, command) {
             }));
             break;
         }
+        case 'LaunchSortie': {
+            const s = world.state.structures[command.airbaseId];
+            if (s && s.hangarJets) {
+                const jet = s.hangarJets.find(j => j.id === command.unitId);
+                if (jet && jet.status === 'Ready in Hangar') {
+                    jet.status = 'In Flight';
+                    db_1.dbManager.saveStructure(s);
+                    broadcast({
+                        type: 'StateDiff',
+                        serverTime: Date.now(),
+                        updatedStructures: [s]
+                    });
+                    console.log(`[Server] Sortie launched from ${s.name}: ${jet.name} -> (${command.targetLat}, ${command.targetLng})`);
+                }
+            }
+            break;
+        }
+        case 'LaunchMissile': {
+            const s = world.state.structures[command.siloId];
+            if (s && s.type === 'missile_silo') {
+                if (!s.equippedMissiles || s.equippedMissiles.length === 0) {
+                    s.equippedMissiles = ['missile_ballistic', 'missile_cruise', 'missile_hypersonic', 'missile_cluster'];
+                }
+                const idx = s.equippedMissiles.indexOf(command.missileType);
+                const mslType = idx >= 0 ? s.equippedMissiles.splice(idx, 1)[0] : (s.equippedMissiles.pop() || command.missileType);
+                s.missileMunitions = s.equippedMissiles.length;
+                db_1.dbManager.saveStructure(s);
+                const mslId = `${mslType}_${Date.now().toString(36)}`;
+                broadcast({
+                    type: 'MissileLaunched',
+                    missileId: mslId,
+                    siloId: s.id,
+                    missileType: mslType,
+                    fromLat: s.position.lat,
+                    fromLng: s.position.lng,
+                    toLat: command.targetLat,
+                    toLng: command.targetLng,
+                    speedMach: mslType.includes('hypersonic') ? 8.5 : (mslType.includes('ballistic') ? 5.2 : 1.8),
+                    flightDurationSeconds: 25.0
+                });
+                broadcast({
+                    type: 'StateDiff',
+                    serverTime: Date.now(),
+                    updatedStructures: [s]
+                });
+                console.log(`[Server] Missile launched from ${s.name}: ${mslType} -> (${command.targetLat}, ${command.targetLng})`);
+            }
+            break;
+        }
+        case 'DropBomb': {
+            const bombId = `bomb_${Date.now().toString(36)}`;
+            broadcast({
+                type: 'BombDropped',
+                bombId: bombId,
+                unitId: command.unitId,
+                fromLat: command.targetLat + 0.01,
+                fromLng: command.targetLng + 0.01,
+                toLat: command.targetLat,
+                toLng: command.targetLng,
+                flightDurationSeconds: 15.0
+            });
+            console.log(`[Server] Bomb dropped by unit ${command.unitId} -> (${command.targetLat}, ${command.targetLng})`);
+            break;
+        }
     }
 }
+// Graceful process shutdown
+process.on('SIGINT', async () => {
+    console.log('[Server] Gracefully shutting down...');
+    await db_1.dbManager.close();
+    process.exit(0);
+});
+process.on('SIGTERM', async () => {
+    console.log('[Server] Gracefully terminating...');
+    await db_1.dbManager.close();
+    process.exit(0);
+});

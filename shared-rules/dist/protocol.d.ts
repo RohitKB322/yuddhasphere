@@ -35,6 +35,17 @@ export type ClientCommand = {
     targetLat: number;
     targetLng: number;
 } | {
+    type: 'LaunchMissile';
+    siloId: string;
+    missileType: string;
+    targetLat: number;
+    targetLng: number;
+} | {
+    type: 'DropBomb';
+    unitId: string;
+    targetLat: number;
+    targetLng: number;
+} | {
     type: 'CreateAlliance';
     name: string;
     tag: string;
@@ -89,6 +100,26 @@ export type ServerMessage = {
     type: 'LeaderboardSync';
     entries: LeaderboardEntry[];
     metric: string;
+} | {
+    type: 'MissileLaunched';
+    missileId: string;
+    siloId: string;
+    missileType: string;
+    fromLat: number;
+    fromLng: number;
+    toLat: number;
+    toLng: number;
+    speedMach: number;
+    flightDurationSeconds: number;
+} | {
+    type: 'BombDropped';
+    bombId: string;
+    unitId: string;
+    fromLat: number;
+    fromLng: number;
+    toLat: number;
+    toLng: number;
+    flightDurationSeconds: number;
 } | {
     type: 'Alert';
     level: 'info' | 'warn' | 'danger';

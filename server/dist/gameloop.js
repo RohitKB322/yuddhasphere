@@ -48,11 +48,11 @@ class GameLoop {
                 }
             }
         }
-        // 3. Periodic persistence save every 30 seconds (Local File + MongoDB)
-        if (this.tickCount % 30 === 0) {
+        // 3. Periodic persistence save every 20 seconds (Local File + Debounced MongoDB Flush)
+        if (this.tickCount % 20 === 0) {
             this.world.state.lastTickTime = now;
             this.persistence.saveWorld(this.world);
-            db_1.dbManager.saveFullWorld(this.world).catch(() => { });
+            db_1.dbManager.flushDirty().catch(err => console.error('[Database] Flush error:', err.message));
         }
         // 4. Hourly timestamped backup (every 3600 seconds)
         if (this.tickCount % 3600 === 0) {

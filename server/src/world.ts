@@ -53,6 +53,37 @@ export class World {
     this.spatialStructures.remove(id);
   }
 
+  public catchUp(elapsedSeconds: number): number {
+    if (elapsedSeconds <= 0) return 0;
+    const cappedSeconds = Math.min(elapsedSeconds, 7 * 86400); // Up to 7 days
+    const hours = cappedSeconds / 3600;
+    const now = Date.now();
+
+    for (const player of Object.values(this.state.players)) {
+      const rate = player.incomePerHour || 100;
+      const gain = Math.floor(rate * hours);
+      player.wealth = (player.wealth || 0) + gain;
+      player.lastActive = now;
+    }
+
+    for (const s of Object.values(this.state.structures)) {
+      if (s.upgradeFinishedAt && now >= s.upgradeFinishedAt) {
+        s.upgradeFinishedAt = undefined;
+        s.level += 1;
+        s.hp = s.maxHp = (s.maxHp || 200) + 150;
+      }
+      if (s.slots && s.slots.queue) {
+        const ready = s.slots.queue.filter(q => q.finishesAt <= now);
+        s.slots.queue = s.slots.queue.filter(q => q.finishesAt > now);
+        ready.forEach(r => s.slots.storedUnits.push(r.itemId));
+      }
+    }
+
+    this.state.lastTickTime = now;
+    console.log(`[World] Global catch-up executed for ${cappedSeconds}s across ${Object.keys(this.state.players).length} players.`);
+    return cappedSeconds;
+  }
+
   public getUnits(): Unit[] {
     return Object.values(this.state.units);
   }

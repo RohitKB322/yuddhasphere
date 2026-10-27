@@ -225,6 +225,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                     // Purchase into hangar if not yet purchased
                     val buyResult = gameState.buyJetForAirbase(airbase.id, selectedJetOrMunitionId)
                     if (buyResult.first) {
+                        gameClient.sendBuyItem(airbase.id, selectedJetOrMunitionId)
                         val newJet = airbase.hangarJets.last()
                         promptSortieTargeting(airbase.id, newJet.id, newJet.name)
                     } else {
@@ -625,7 +626,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             binding.btnInspectorUpgrade.visibility = View.VISIBLE
             binding.btnInspectorUpgrade.text = "UPGRADE ($${cat.upgradeCost})"
             binding.btnInspectorUpgrade.setOnClickListener {
-                gameState.upgradeStructure(s.id)
+                val res = gameState.upgradeStructure(s.id)
+                if (res.first) {
+                    gameClient.sendUpgrade(s.id)
+                }
                 binding.cardStructureInspector.visibility = View.GONE
             }
         } else {
@@ -634,14 +638,20 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
         // Repair button
         binding.btnInspectorRepair.setOnClickListener {
-            gameState.repairStructure(s.id)
-            binding.tvInspectorHp.text = "${s.hp} / ${s.maxHp}"
-            binding.pbInspectorHp.progress = s.hp
+            val res = gameState.repairStructure(s.id)
+            if (res.first) {
+                gameClient.sendRepairStructure(s.id)
+                binding.tvInspectorHp.text = "${s.hp} / ${s.maxHp}"
+                binding.pbInspectorHp.progress = s.hp
+            }
         }
 
         // Sell button
         binding.btnInspectorSell.setOnClickListener {
-            gameState.sellStructure(s.id)
+            val res = gameState.sellStructure(s.id)
+            if (res.first) {
+                gameClient.sendSell(s.id)
+            }
             binding.cardStructureInspector.visibility = View.GONE
             binding.mapWebView.evaluateJavascript("window.deselectAll();", null)
         }

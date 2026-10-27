@@ -19,8 +19,18 @@ async function bootstrap() {
     if (dbConnected) {
         await db_1.dbManager.loadWorldState(world);
         persistence.setLoaded(true);
-        persistence.saveWorld(world);
     }
+    // Global world catch-up: compute offline income & timers across all players
+    const now = Date.now();
+    const lastTick = world.state.lastTickTime || now;
+    const elapsedSeconds = Math.max(0, Math.floor((now - lastTick) / 1000));
+    if (elapsedSeconds > 1) {
+        world.catchUp(elapsedSeconds);
+        if (dbConnected) {
+            await db_1.dbManager.saveFullWorld(world);
+        }
+    }
+    persistence.saveWorld(world);
     gameLoop.start();
 }
 bootstrap();
@@ -75,6 +85,8 @@ function handleCommand(ws, command) {
     switch (command.type) {
         case 'Register': {
             let player = world.getPlayer(command.deviceId);
+            const now = Date.now();
+            let offlineEarned = 0;
             if (!player) {
                 player = {
                     id: command.deviceId,
@@ -89,29 +101,45 @@ function handleCommand(ws, command) {
                     hp: 1000,
                     maxHp: 1000,
                     isOnline: true,
-                    lastActive: Date.now(),
+                    lastActive: now,
                     bannedState: 'none'
                 };
                 world.setPlayer(player);
             }
             else {
-                player.callsign = command.callsign || player.callsign;
+                if (command.callsign && command.callsign.trim().length > 0) {
+                    player.callsign = command.callsign;
+                }
                 player.isOnline = true;
-                player.lastActive = Date.now();
+                if (player.lastActive && now > player.lastActive) {
+                    const offlineHours = Math.min((now - player.lastActive) / 3600000, 168);
+                    if (offlineHours > (1 / 60)) { // At least 1 min
+                        offlineEarned = Math.floor((player.incomePerHour || 100) * offlineHours);
+                        player.wealth = Math.floor(player.wealth || 0) + offlineEarned;
+                    }
+                }
+                player.lastActive = now;
             }
             db_1.dbManager.savePlayer(player);
             clients.set(ws, player.id);
             // Send InitSync with world snapshot and alliance
             const initMsg = {
                 type: 'InitSync',
-                player,
+                player: { ...player, wealth: Math.floor(player.wealth) },
                 structures: world.getStructures(),
                 units: world.getUnits(),
-                serverTime: Date.now(),
+                serverTime: now,
                 alliance: player.allianceId ? world.alliances.getAlliance(player.allianceId) : null
             };
             ws.send(JSON.stringify(initMsg));
-            console.log(`[Server] Commander registered & synced: ${player.callsign} (${player.id})`);
+            if (offlineEarned > 0) {
+                ws.send(JSON.stringify({
+                    type: 'Alert',
+                    level: 'info',
+                    text: `Welcome back, Commander! Your territory generated +$${offlineEarned} while you were offline.`
+                }));
+            }
+            console.log(`[Server] Commander registered: ${player.callsign} (${player.id}), wealth: $${Math.floor(player.wealth)}, structures: ${world.getStructures().length}`);
             break;
         }
         case 'ReportLocation': {
@@ -184,6 +212,45 @@ function handleCommand(ws, command) {
                 serverTime: Date.now(),
                 removedStructureIds: [command.structureId]
             });
+            break;
+        }
+        case 'BuyItem': {
+            const s = world.state.structures[command.structureId];
+            if (s) {
+                if (!s.hangarJets)
+                    s.hangarJets = [];
+                const jet = {
+                    id: `jet_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
+                    catalogId: command.catalogId,
+                    name: command.catalogId.replace('jet_', '').toUpperCase(),
+                    role: 'Fighter',
+                    hp: 100,
+                    maxHp: 100,
+                    status: 'Ready in Hangar'
+                };
+                s.hangarJets.push(jet);
+                db_1.dbManager.saveStructure(s);
+                persistence.saveWorld(world);
+                broadcast({
+                    type: 'StateDiff',
+                    serverTime: Date.now(),
+                    updatedStructures: [s]
+                });
+            }
+            break;
+        }
+        case 'RepairStructure': {
+            const s = world.state.structures[command.structureId];
+            if (s) {
+                s.hp = s.maxHp;
+                db_1.dbManager.saveStructure(s);
+                persistence.saveWorld(world);
+                broadcast({
+                    type: 'StateDiff',
+                    serverTime: Date.now(),
+                    updatedStructures: [s]
+                });
+            }
             break;
         }
         case 'CreateAlliance': {

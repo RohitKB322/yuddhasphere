@@ -47,6 +47,16 @@ export interface Structure {
             finishesAt: number;
         }[];
     };
+    hangarJets?: Array<{
+        id: string;
+        catalogId: string;
+        name: string;
+        role: string;
+        hp: number;
+        maxHp: number;
+        status: string;
+    }>;
+    samMunitions?: number;
 }
 export interface Unit {
     id: string;

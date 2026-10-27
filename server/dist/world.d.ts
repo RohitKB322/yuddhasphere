@@ -24,6 +24,7 @@ export declare class World {
     getStructures(): Structure[];
     addStructure(structure: Structure): void;
     removeStructure(id: string): void;
+    catchUp(elapsedSeconds: number): number;
     getUnits(): Unit[];
     addUnit(unit: Unit): void;
     updateUnit(unit: Unit): void;

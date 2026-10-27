@@ -80,26 +80,7 @@ class LocalGameState(private val context: Context) {
 
             val sArr = JSONArray()
             structures.forEach { s ->
-                val sObj = JSONObject().apply {
-                    put("id", s.id)
-                    put("ownerId", s.ownerId)
-                    put("team", s.team)
-                    put("teamColor", s.teamColor)
-                    put("type", s.type)
-                    put("name", s.name)
-                    put("level", s.level)
-                    put("hp", s.hp)
-                    put("maxHp", s.maxHp)
-                    put("radiusMeters", s.radiusMeters)
-                    put("radiusType", s.radiusType)
-                    put("online", s.online)
-                    val pos = JSONObject().apply {
-                        put("lat", s.position.lat)
-                        put("lng", s.position.lng)
-                    }
-                    put("position", pos)
-                }
-                sArr.put(sObj)
+                sArr.put(s.toJsonObject())
             }
             root.put("structures", sArr)
 
@@ -139,23 +120,41 @@ class LocalGameState(private val context: Context) {
                 for (i in 0 until sArr.length()) {
                     val sObj = sArr.getJSONObject(i)
                     val posObj = sObj.getJSONObject("position")
-                    structures.add(
-                        Structure(
-                            id = sObj.getString("id"),
-                            ownerId = sObj.optString("ownerId", player.id),
-                            team = sObj.optString("team", player.team),
-                            teamColor = sObj.optString("teamColor", player.teamColor),
-                            type = sObj.getString("type"),
-                            name = sObj.optString("name", "Structure"),
-                            level = sObj.optInt("level", 1),
-                            position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng")),
-                            hp = sObj.optInt("hp", 100),
-                            maxHp = sObj.optInt("maxHp", 100),
-                            radiusMeters = sObj.optDouble("radiusMeters", 150.0),
-                            radiusType = sObj.optString("radiusType", "influence"),
-                            online = sObj.optBoolean("online", true)
-                        )
+                    val s = Structure(
+                        id = sObj.getString("id"),
+                        ownerId = sObj.optString("ownerId", player.id),
+                        team = sObj.optString("team", player.team),
+                        teamColor = sObj.optString("teamColor", player.teamColor),
+                        type = sObj.getString("type"),
+                        name = sObj.optString("name", "Structure"),
+                        level = sObj.optInt("level", 1),
+                        position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng")),
+                        hp = sObj.optInt("hp", 100),
+                        maxHp = sObj.optInt("maxHp", 100),
+                        radiusMeters = sObj.optDouble("radiusMeters", 150.0),
+                        radiusType = sObj.optString("radiusType", "influence"),
+                        online = sObj.optBoolean("online", true),
+                        upgradeFinishedAt = if (sObj.has("upgradeFinishedAt") && !sObj.isNull("upgradeFinishedAt")) sObj.getLong("upgradeFinishedAt") else null,
+                        samMunitions = sObj.optInt("samMunitions", 6)
                     )
+                    if (sObj.has("hangarJets")) {
+                        val jArr = sObj.getJSONArray("hangarJets")
+                        for (j in 0 until jArr.length()) {
+                            val jObj = jArr.getJSONObject(j)
+                            s.hangarJets.add(
+                                HangarJetItem(
+                                    id = jObj.getString("id"),
+                                    catalogId = jObj.getString("catalogId"),
+                                    name = jObj.optString("name", "Fighter"),
+                                    role = jObj.optString("role", "Air Superiority"),
+                                    hp = jObj.optInt("hp", 100),
+                                    maxHp = jObj.optInt("maxHp", 100),
+                                    status = jObj.optString("status", "Ready in Hangar")
+                                )
+                            )
+                        }
+                    }
+                    structures.add(s)
                 }
                 recalculateIncome()
                 return true
@@ -526,6 +525,7 @@ class LocalGameState(private val context: Context) {
             it.onStructuresUpdated(structures)
             it.onAlert("Jet Procured", "${jet.name} delivered to Hangar (Slot ${base.hangarJets.size}/${base.maxHangarSlots()}).")
         }
+        saveLocalWorld()
         return Pair(true, "${jet.name} added to Hangar.")
     }
 
@@ -642,6 +642,7 @@ class LocalGameState(private val context: Context) {
             it.onStructuresUpdated(structures)
             it.onAlert("SAM Re-Armed", "Loaded interceptor missiles into battery (${sam.samMunitions}/${sam.maxSamSlots()}).")
         }
+        saveLocalWorld()
         return Pair(true, "+4 Interceptors armed.")
     }
 
@@ -661,6 +662,7 @@ class LocalGameState(private val context: Context) {
             it.onStructuresUpdated(structures)
             it.onAlert("Silo Armed", "Loaded 1x Interceptor into Silo #${sam.samMunitions}.")
         }
+        saveLocalWorld()
         return Pair(true, "Missile armed.")
     }
 

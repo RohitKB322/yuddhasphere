@@ -78,13 +78,13 @@ class GameClient(
                             )
 
                             val structList = mutableListOf<Structure>()
-                            val sArray = json.getJSONArray("structures")
-                            for (i in 0 until sArray.length()) {
-                                val sObj = sArray.getJSONObject(i)
-                                structList.add(
-                                    Structure(
+                            val sArray = json.optJSONArray("structures")
+                            if (sArray != null) {
+                                for (i in 0 until sArray.length()) {
+                                    val sObj = sArray.getJSONObject(i)
+                                    val s = Structure(
                                         id = sObj.getString("id"),
-                                        ownerId = sObj.getString("ownerId"),
+                                        ownerId = sObj.optString("ownerId", player.id),
                                         team = sObj.optString("team", "blue"),
                                         teamColor = sObj.optString("teamColor", "#00E5FF"),
                                         type = sObj.getString("type"),
@@ -98,9 +98,29 @@ class GameClient(
                                         maxHp = sObj.optInt("maxHp", 100),
                                         radiusMeters = sObj.optDouble("radiusMeters", 150.0),
                                         radiusType = sObj.optString("radiusType", "influence"),
-                                        online = sObj.optBoolean("online", true)
+                                        online = sObj.optBoolean("online", true),
+                                        upgradeFinishedAt = if (sObj.has("upgradeFinishedAt") && !sObj.isNull("upgradeFinishedAt")) sObj.getLong("upgradeFinishedAt") else null,
+                                        samMunitions = sObj.optInt("samMunitions", 6)
                                     )
-                                )
+                                    if (sObj.has("hangarJets")) {
+                                        val jArr = sObj.getJSONArray("hangarJets")
+                                        for (k in 0 until jArr.length()) {
+                                            val jObj = jArr.getJSONObject(k)
+                                            s.hangarJets.add(
+                                                com.yuddhasphere.models.HangarJetItem(
+                                                    id = jObj.getString("id"),
+                                                    catalogId = jObj.getString("catalogId"),
+                                                    name = jObj.optString("name", "Fighter"),
+                                                    role = jObj.optString("role", "Air Superiority"),
+                                                    hp = jObj.optInt("hp", 100),
+                                                    maxHp = jObj.optInt("maxHp", 100),
+                                                    status = jObj.optString("status", "Ready in Hangar")
+                                                )
+                                            )
+                                        }
+                                    }
+                                    structList.add(s)
+                                }
                             }
                             mainHandler.post { listener.onInitSyncReceived(player, structList) }
                         }
@@ -181,6 +201,23 @@ class GameClient(
     fun sendSell(structureId: String) {
         val json = JSONObject().apply {
             put("type", "SellStructure")
+            put("structureId", structureId)
+        }
+        send(json)
+    }
+
+    fun sendBuyItem(structureId: String, catalogId: String) {
+        val json = JSONObject().apply {
+            put("type", "BuyItem")
+            put("structureId", structureId)
+            put("catalogId", catalogId)
+        }
+        send(json)
+    }
+
+    fun sendRepairStructure(structureId: String) {
+        val json = JSONObject().apply {
+            put("type", "RepairStructure")
             put("structureId", structureId)
         }
         send(json)

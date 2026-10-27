@@ -367,6 +367,8 @@ class MarketSheet(
         targetUnitId: String?,
         targetName: String,
         speedMach: Double,
-        hitProbability: Double
+        hitProbability: Double,
+        flightDurationSeconds: Double,
+        progress: Double
     ) {}
 }

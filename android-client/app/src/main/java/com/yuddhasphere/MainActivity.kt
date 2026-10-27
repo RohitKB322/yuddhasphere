@@ -1078,6 +1078,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                     }
                 }
 
+                siloCard.setOnClickListener {
+                    binding.cardStructureInspector.visibility = View.GONE
+                    promptMissileTargeting(s.id, mslType)
+                }
                 siloCard.addView(tvTitle)
                 siloCard.addView(tvStatus)
                 siloCard.addView(tvRange)
@@ -1301,6 +1305,30 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         syncPlayerPositionToMap(autoRecenter = true)
         syncWorldToMap()
         syncUnitsToMap()
+        syncActiveMissilesToMap()
+    }
+
+    private fun syncActiveMissilesToMap() {
+        if (!isMapReady) return
+        gameState.activeMissiles.forEach { m ->
+            if (!m.finished) {
+                val missileObj = JSONObject().apply {
+                    put("id", m.id)
+                    put("fromLat", m.startPos.lat)
+                    put("fromLng", m.startPos.lng)
+                    put("toLat", m.targetPos.lat)
+                    put("toLng", m.targetPos.lng)
+                    put("missileType", m.type)
+                    put("targetUnitId", m.targetUnitId ?: "")
+                    put("targetName", m.targetName)
+                    put("speedMach", m.speedMach)
+                    put("hitProbability", 0.98)
+                    put("durationMs", (m.totalFlightTimeSeconds * 1000.0).toLong())
+                    put("progress", m.progress)
+                }
+                binding.mapWebView.evaluateJavascript("window.launchActiveMissile(${missileObj});", null)
+            }
+        }
     }
 
     override fun onBuildingClicked(structureId: String) {
@@ -1561,7 +1589,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         targetUnitId: String?,
         targetName: String,
         speedMach: Double,
-        hitProbability: Double
+        hitProbability: Double,
+        flightDurationSeconds: Double,
+        progress: Double
     ) {
         if (isMapReady) {
             val missileObj = JSONObject().apply {
@@ -1575,6 +1605,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 put("targetName", targetName)
                 put("speedMach", speedMach)
                 put("hitProbability", hitProbability)
+                put("durationMs", (flightDurationSeconds * 1000.0).toLong())
+                put("progress", progress)
             }
             // Launch active missile (do NOT auto-track on launch; camera follows only when clicked)
             val script = "window.launchActiveMissile(${missileObj});"

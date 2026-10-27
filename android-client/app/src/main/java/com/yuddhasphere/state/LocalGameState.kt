@@ -31,7 +31,9 @@ class LocalGameState(private val context: Context) {
             targetUnitId: String? = null,
             targetName: String = "Target Vector",
             speedMach: Double = 4.2,
-            hitProbability: Double = 0.88
+            hitProbability: Double = 0.88,
+            flightDurationSeconds: Double = 15.0,
+            progress: Double = 0.0
         )
         fun onMarketUpdated(assets: List<MarketAsset>, holdings: Map<String, PortfolioHolding>)
     }
@@ -47,6 +49,8 @@ class LocalGameState(private val context: Context) {
     val combatReports: MutableList<CombatReportItem> = mutableListOf()
     val marketAssets: MutableMap<String, MarketAsset> = mutableMapOf()
     val marketNews: MutableList<MarketNewsItem> = mutableListOf()
+    val activeMissiles: MutableList<com.yuddhasphere.models.InFlightMissile> = mutableListOf()
+    private val hostileStrikeCooldownMap: MutableMap<String, Long> = mutableMapOf()
 
     private val listeners: MutableList<StateListener> = mutableListOf()
     private val handler = Handler(Looper.getMainLooper())
@@ -119,6 +123,12 @@ class LocalGameState(private val context: Context) {
                 mArr.put(m.toJsonObject())
             }
             root.put("marketAssets", mArr)
+
+            val mslArr = JSONArray()
+            activeMissiles.forEach { msl ->
+                mslArr.put(msl.toJsonObject())
+            }
+            root.put("activeMissiles", mslArr)
 
             val file = File(context.filesDir, "world_cache.json")
             file.writeText(root.toString())
@@ -290,6 +300,52 @@ class LocalGameState(private val context: Context) {
                         val hj = base?.hangarJets?.find { it.id == u.id }
                         if (hj != null) {
                             hj.status = "In Flight"
+                        }
+                    }
+                }
+
+                if (root.has("activeMissiles")) {
+                    activeMissiles.clear()
+                    val mArr = root.getJSONArray("activeMissiles")
+                    val now = System.currentTimeMillis()
+                    for (i in 0 until mArr.length()) {
+                        val mObj = mArr.getJSONObject(i)
+                        val startPosObj = mObj.getJSONObject("startPos")
+                        val targetPosObj = mObj.getJSONObject("targetPos")
+                        val curPosObj = if (mObj.has("currentPos")) mObj.getJSONObject("currentPos") else startPosObj
+                        val launchedAt = mObj.optLong("launchedAt", now)
+                        val totalFlightTimeSec = mObj.optDouble("totalFlightTimeSeconds", 30.0)
+                        val elapsedSec = (now - launchedAt) / 1000.0
+                        val progress = (elapsedSec / totalFlightTimeSec).coerceIn(0.0, 1.0)
+                        val finished = mObj.optBoolean("finished", false) || (progress >= 1.0)
+                        val intercepted = mObj.optBoolean("intercepted", false)
+
+                        val m = com.yuddhasphere.models.InFlightMissile(
+                            id = mObj.getString("id"),
+                            type = mObj.getString("type"),
+                            ownerId = mObj.optString("ownerId", player.id),
+                            team = mObj.optString("team", player.team),
+                            startPos = GeoPoint(startPosObj.getDouble("lat"), startPosObj.getDouble("lng")),
+                            currentPos = GeoPoint(curPosObj.getDouble("lat"), curPosObj.getDouble("lng")),
+                            targetPos = GeoPoint(targetPosObj.getDouble("lat"), targetPosObj.getDouble("lng")),
+                            targetUnitId = if (mObj.has("targetUnitId") && !mObj.isNull("targetUnitId")) mObj.getString("targetUnitId") else null,
+                            targetStructureId = if (mObj.has("targetStructureId") && !mObj.isNull("targetStructureId")) mObj.getString("targetStructureId") else null,
+                            targetName = mObj.optString("targetName", "Tactical Target"),
+                            totalDistanceMeters = mObj.optDouble("totalDistanceMeters", 100000.0),
+                            speedMach = mObj.optDouble("speedMach", 4.0),
+                            speedMps = mObj.optDouble("speedMps", 1360.0),
+                            totalFlightTimeSeconds = totalFlightTimeSec,
+                            launchedAt = launchedAt,
+                            progress = progress,
+                            finished = finished,
+                            intercepted = intercepted,
+                            interceptedBySamId = if (mObj.has("interceptedBySamId") && !mObj.isNull("interceptedBySamId")) mObj.getString("interceptedBySamId") else null
+                        )
+
+                        if (!m.finished) {
+                            activeMissiles.add(m)
+                        } else if (!m.intercepted) {
+                            applyExplosionDamage(m.targetPos, m.type)
                         }
                     }
                 }
@@ -671,6 +727,199 @@ class LocalGameState(private val context: Context) {
                 tickCounter++
                 if (tickCounter % 5 == 0) {
                     saveLocalWorld()
+                }
+            }
+        }
+
+        // 4. In-Flight Missiles & Projectiles Simulation
+        if (activeMissiles.isNotEmpty()) {
+            val mIterator = activeMissiles.iterator()
+            val mNow = System.currentTimeMillis()
+            while (mIterator.hasNext()) {
+                val m = mIterator.next()
+                val elapsedSec = (mNow - m.launchedAt) / 1000.0
+                m.progress = (elapsedSec / m.totalFlightTimeSeconds).coerceIn(0.0, 1.0)
+                val dLat = m.targetPos.lat - m.startPos.lat
+                val dLng = m.targetPos.lng - m.startPos.lng
+                m.currentPos = GeoPoint(
+                    m.startPos.lat + dLat * m.progress,
+                    m.startPos.lng + dLng * m.progress
+                )
+
+                if (m.progress >= 1.0) {
+                    m.finished = true
+                    mIterator.remove()
+                    if (!m.intercepted) {
+                        applyExplosionDamage(m.targetPos, m.type)
+                        addCombatReport(
+                            "combat",
+                            "TACTICAL STRIKE IMPACT",
+                            "${getMissileInfo(m.type).name} reached designated target coordinates and detonated!",
+                            "danger"
+                        )
+                    } else {
+                        addCombatReport(
+                            "combat",
+                            "INTERCEPTION SUCCESS",
+                            "${m.type.uppercase()} destroyed in mid-air by SAM air defense.",
+                            "info"
+                        )
+                    }
+                    stateChanged = true
+                }
+            }
+        }
+
+        // 5. Active SAM Air Defense Interception for Projectiles (Missiles & Bombs within 100km)
+        val samAirDefenseBatteries = structures.filter { it.type == "sam" && it.online && it.samMunitions > 0 }
+        for (sam in samAirDefenseBatteries) {
+            for (m in activeMissiles) {
+                if (m.finished || m.intercepted || m.type == "sam_interceptor") continue
+
+                val isHostile = (m.team != sam.team)
+                val distToSam = GeoMath.calculateDistanceMeters(sam.position, m.currentPos)
+                val distToTargetFromSam = GeoMath.calculateDistanceMeters(sam.position, m.targetPos)
+
+                if (isHostile && (distToSam <= 100000.0 || distToTargetFromSam <= 100000.0)) {
+                    val lastFired = samCooldownMap[sam.id] ?: 0L
+                    if (now - lastFired > 6000L) {
+                        samCooldownMap[sam.id] = now
+                        sam.samMunitions -= 1
+                        m.intercepted = true
+                        m.interceptedBySamId = sam.id
+
+                        val interceptProgress = (m.progress + 0.30).coerceAtMost(0.85)
+                        val interceptLat = m.startPos.lat + (m.targetPos.lat - m.startPos.lat) * interceptProgress
+                        val interceptLng = m.startPos.lng + (m.targetPos.lng - m.startPos.lng) * interceptProgress
+                        val interceptPos = GeoPoint(interceptLat, interceptLng)
+
+                        val samDist = GeoMath.calculateDistanceMeters(sam.position, interceptPos)
+                        val samMach = 4.8
+                        val samEffSpeed = samMach * 340.0 * 4.0
+                        val samFlightSec = (samDist / samEffSpeed).coerceAtLeast(4.0)
+
+                        val samMslId = "sam_abm_" + UUID.randomUUID().toString().take(6)
+                        val samInterceptor = com.yuddhasphere.models.InFlightMissile(
+                            id = samMslId,
+                            type = "sam_interceptor",
+                            ownerId = sam.ownerId,
+                            team = sam.team,
+                            startPos = sam.position,
+                            currentPos = sam.position,
+                            targetPos = interceptPos,
+                            targetUnitId = null,
+                            targetStructureId = null,
+                            targetName = "INTERCEPT: ${m.type.uppercase()}",
+                            totalDistanceMeters = samDist,
+                            speedMach = samMach,
+                            speedMps = samMach * 340.0,
+                            totalFlightTimeSeconds = samFlightSec,
+                            launchedAt = now,
+                            progress = 0.0,
+                            finished = false,
+                            intercepted = false
+                        )
+                        activeMissiles.add(samInterceptor)
+
+                        listeners.forEach {
+                            it.onStructuresUpdated(structures)
+                            it.onMissileFired(
+                                missileId = samMslId,
+                                fromLat = sam.position.lat,
+                                fromLng = sam.position.lng,
+                                toLat = interceptPos.lat,
+                                toLng = interceptPos.lng,
+                                missileType = "sam_interceptor",
+                                targetUnitId = null,
+                                targetName = "PAC-3 MSE ABM Interceptor",
+                                speedMach = samMach,
+                                hitProbability = 1.0,
+                                flightDurationSeconds = samFlightSec,
+                                progress = 0.0
+                            )
+                            it.onAlert(
+                                "SAM AIR DEFENSE ENGAGED!",
+                                "${sam.name} locked onto incoming ${m.type.uppercase()}! PAC-3 ABM fired! (${sam.samMunitions} left)"
+                            )
+                        }
+                        addCombatReport(
+                            category = "combat",
+                            urgencyTag = "ABM INTERCEPT",
+                            title = "SAM Interceptor Engaged Incoming Weapon",
+                            detail = "${sam.name} acquired incoming projectile (${(distToSam / 1000).toInt()}km) and launched PAC-3 MSE hypersonic interceptor.",
+                            level = "warn"
+                        )
+                        stateChanged = true
+                        break
+                    }
+                }
+            }
+        }
+
+        // 6. Hostile Bogey Autonomous Attack Runs (Munition releases toward player)
+        for (u in activeUnits) {
+            if (u.team == "red") {
+                val targetStruct = structures.filter { it.ownerId == player.id }.minByOrNull {
+                    GeoMath.calculateDistanceMeters(u.position, it.position)
+                }
+                if (targetStruct != null) {
+                    val distToStruct = GeoMath.calculateDistanceMeters(u.position, targetStruct.position)
+                    if (distToStruct <= 45000.0) {
+                        val lastStrike = hostileStrikeCooldownMap[u.id] ?: 0L
+                        if (now - lastStrike > 45000L) {
+                            hostileStrikeCooldownMap[u.id] = now
+                            val bombDist = distToStruct
+                            val bombMach = 0.45
+                            val bombDuration = (bombDist / (bombMach * 340.0 * 4.0)).coerceAtLeast(8.0)
+                            val bombId = "opfor_bomb_" + UUID.randomUUID().toString().take(6)
+                            val opforBomb = com.yuddhasphere.models.InFlightMissile(
+                                id = bombId,
+                                type = "bomb",
+                                ownerId = u.ownerId,
+                                team = "red",
+                                startPos = u.position,
+                                currentPos = u.position,
+                                targetPos = targetStruct.position,
+                                targetUnitId = null,
+                                targetStructureId = targetStruct.id,
+                                targetName = "HOSTILE BOMB -> ${targetStruct.name}",
+                                totalDistanceMeters = bombDist,
+                                speedMach = bombMach,
+                                speedMps = bombMach * 340.0,
+                                totalFlightTimeSeconds = bombDuration,
+                                launchedAt = now,
+                                progress = 0.0,
+                                finished = false,
+                                intercepted = false
+                            )
+                            activeMissiles.add(opforBomb)
+                            listeners.forEach {
+                                it.onMissileFired(
+                                    missileId = bombId,
+                                    fromLat = u.position.lat,
+                                    fromLng = u.position.lng,
+                                    toLat = targetStruct.position.lat,
+                                    toLng = targetStruct.position.lng,
+                                    missileType = "bomb",
+                                    targetUnitId = null,
+                                    targetName = "HOSTILE BOMB -> ${targetStruct.name}",
+                                    speedMach = bombMach,
+                                    hitProbability = 0.95,
+                                    flightDurationSeconds = bombDuration,
+                                    progress = 0.0
+                                )
+                                it.onAlert("INCOMING WEAPON!", "${u.name} released guided bomb targeting ${targetStruct.name}!")
+                            }
+                            addCombatReport(
+                                category = "combat",
+                                urgencyTag = "AIR RAID WARNING",
+                                title = "Hostile Aircraft Munition Inbound",
+                                detail = "${u.name} dropped guided munition targeting ${targetStruct.name}. Defense perimeter alerted.",
+                                level = "danger"
+                            )
+                            stateChanged = true
+                        }
+                    }
                 }
             }
         }
@@ -1123,8 +1372,14 @@ class LocalGameState(private val context: Context) {
     )
 
     fun getMissileInfo(missileId: String): com.yuddhasphere.models.MissileCatalogItem {
-        return missileCatalog.find { it.id == missileId }
-            ?: missileCatalog[1]
+        val cleanId = missileId.lowercase()
+        return missileCatalog.find {
+            it.id == cleanId || it.trajectoryType == cleanId || it.id.removePrefix("missile_") == cleanId
+        } ?: if (cleanId.contains("ballistic") || cleanId.contains("agni")) missileCatalog[0]
+          else if (cleanId.contains("hypersonic") || cleanId.contains("df17")) missileCatalog[2]
+          else if (cleanId.contains("cluster") || cleanId.contains("cbu")) missileCatalog[3]
+          else if (cleanId.contains("antiship") || cleanId.contains("brahmos") || cleanId.contains("lrasm")) missileCatalog[4]
+          else missileCatalog[1]
     }
 
     fun buyMissileForSilo(siloId: String, missileCatalogId: String): Pair<Boolean, String> {
@@ -1153,8 +1408,13 @@ class LocalGameState(private val context: Context) {
     }
 
     fun fireSiloMissile(siloId: String, targetPos: GeoPoint, missileType: String): Pair<Boolean, String> {
-        val silo = structures.find { it.id == siloId && it.type == "missile_silo" && it.online }
-            ?: return Pair(false, "Missile launcher facility not found or offline.")
+        val silo = structures.find { it.id == siloId && it.type == "missile_silo" }
+            ?: return Pair(false, "Missile launcher facility not found.")
+
+        if (silo.hp <= 0) {
+            return Pair(false, "Missile Silo is destroyed! Repair structure before launching.")
+        }
+        silo.online = true
 
         val msl = getMissileInfo(missileType)
         val distM = GeoMath.calculateDistanceMeters(silo.position, targetPos)
@@ -1175,11 +1435,41 @@ class LocalGameState(private val context: Context) {
             }
         }
 
-        val idx = silo.equippedMissiles.indexOf(missileType).let { if (it >= 0) it else 0 }
+        val targetMslId = msl.id
+        val idx = silo.equippedMissiles.indexOfFirst {
+            it == targetMslId || it == missileType || it.removePrefix("missile_") == missileType.removePrefix("missile_")
+        }.let { if (it >= 0) it else 0 }
+
         val launchedType = silo.equippedMissiles.removeAt(idx)
         silo.missileMunitions = silo.equippedMissiles.size
 
-        val mslId = "${launchedType}_" + UUID.randomUUID().toString().take(6)
+        val speedMps = msl.speedMach * 340.0
+        val effectiveSpeedMps = speedMps * 4.0 // RTS 4x time scaling
+        val flightDurationSec = (distM / effectiveSpeedMps).coerceAtLeast(6.0)
+
+        val mslId = "${msl.id}_" + UUID.randomUUID().toString().take(6)
+        val inFlight = com.yuddhasphere.models.InFlightMissile(
+            id = mslId,
+            type = msl.id,
+            ownerId = player.id,
+            team = player.team,
+            startPos = silo.position,
+            currentPos = silo.position,
+            targetPos = targetPos,
+            targetUnitId = null,
+            targetStructureId = null,
+            targetName = "${msl.name} Target [${(distM / 1000).toInt()} km]",
+            totalDistanceMeters = distM,
+            speedMach = msl.speedMach,
+            speedMps = speedMps,
+            totalFlightTimeSeconds = flightDurationSec,
+            launchedAt = System.currentTimeMillis(),
+            progress = 0.0,
+            finished = false,
+            intercepted = false
+        )
+        activeMissiles.add(inFlight)
+
         listeners.forEach {
             it.onStructuresUpdated(structures)
             it.onMissileFired(
@@ -1188,13 +1478,15 @@ class LocalGameState(private val context: Context) {
                 fromLng = silo.position.lng,
                 toLat = targetPos.lat,
                 toLng = targetPos.lng,
-                missileType = launchedType,
+                missileType = msl.id,
                 targetUnitId = null,
                 targetName = "${msl.name} Target [${(distM / 1000).toInt()} km]",
                 speedMach = msl.speedMach,
-                hitProbability = 0.98
+                hitProbability = 0.98,
+                flightDurationSeconds = flightDurationSec,
+                progress = 0.0
             )
-            it.onAlert("MISSILE LAUNCHED", "${msl.name} launched from Silo towards target!")
+            it.onAlert("MISSILE LAUNCHED", "${msl.name} launched from Silo! (Range: ${(distM / 1000).toInt()}km, ETA: ${flightDurationSec.toInt()}s)")
         }
         saveLocalWorld()
         return Pair(true, "${msl.name} launched!")
@@ -1214,7 +1506,33 @@ class LocalGameState(private val context: Context) {
         }
 
         u.bombsRemaining -= 1
+        val speedMps = 0.45 * 340.0
+        val effectiveSpeedMps = speedMps * 4.0
+        val flightDurationSec = (distM / effectiveSpeedMps).coerceAtLeast(6.0)
+
         val bombId = "bomb_" + UUID.randomUUID().toString().take(6)
+        val inFlightBomb = com.yuddhasphere.models.InFlightMissile(
+            id = bombId,
+            type = "bomb",
+            ownerId = u.ownerId,
+            team = u.team,
+            startPos = u.position,
+            currentPos = u.position,
+            targetPos = targetPos,
+            targetUnitId = null,
+            targetStructureId = null,
+            targetName = "Ground Strike Target [${(distM / 1000).toInt()} km]",
+            totalDistanceMeters = distM,
+            speedMach = 0.45,
+            speedMps = speedMps,
+            totalFlightTimeSeconds = flightDurationSec,
+            launchedAt = System.currentTimeMillis(),
+            progress = 0.0,
+            finished = false,
+            intercepted = false
+        )
+        activeMissiles.add(inFlightBomb)
+
         listeners.forEach {
             it.onUnitsUpdated(activeUnits)
             it.onMissileFired(
@@ -1227,9 +1545,11 @@ class LocalGameState(private val context: Context) {
                 targetUnitId = null,
                 targetName = "Ground Strike Target [${(distM / 1000).toInt()} km]",
                 speedMach = 0.45,
-                hitProbability = 0.96
+                hitProbability = 0.96,
+                flightDurationSeconds = flightDurationSec,
+                progress = 0.0
             )
-            it.onAlert("BOMBS AWAY!", "${u.name} released GBU-12 Laser-Guided Bomb! (${u.bombsRemaining} bombs left)")
+            it.onAlert("BOMBS AWAY!", "${u.name} released GBU-12 Guided Bomb! (${u.bombsRemaining} left, ETA: ${flightDurationSec.toInt()}s)")
         }
         saveLocalWorld()
         return Pair(true, "Laser-guided bomb released!")
@@ -1466,6 +1786,7 @@ class LocalGameState(private val context: Context) {
         }
         player.wealth -= repairCost
         s.hp = s.maxHp
+        s.online = true
 
         listeners.forEach {
             it.onPlayerUpdated(player)

@@ -402,6 +402,14 @@
         playerMarker = L.marker([lat, lng], { icon: avatarIcon, zIndexOffset: 1100 }).addTo(map);
         playerMarker.on('click', function(e) {
           L.DomEvent.stopPropagation(e);
+          if (isTargetingSortie) {
+            isTargetingSortie = false;
+            document.getElementById('center-crosshair').style.display = 'none';
+            if (window.AndroidBridge && window.AndroidBridge.onSortieTargetPicked) {
+              window.AndroidBridge.onSortieTargetPicked(lat, lng, "");
+            }
+            return;
+          }
           if (window.AndroidBridge && window.AndroidBridge.onPlayerAvatarClicked) {
             window.AndroidBridge.onPlayerAvatarClicked();
           }
@@ -689,6 +697,14 @@
 
             marker.on('click', function(e) {
               L.DomEvent.stopPropagation(e);
+              if (isTargetingSortie) {
+                isTargetingSortie = false;
+                document.getElementById('center-crosshair').style.display = 'none';
+                if (window.AndroidBridge && window.AndroidBridge.onSortieTargetPicked) {
+                  window.AndroidBridge.onSortieTargetPicked(lat, lng, u.id);
+                }
+                return;
+              }
               if (u.team === 'blue' || !u.team) {
                 selectedJetId = u.id;
                 isTrackingJet = true;
@@ -949,12 +965,13 @@
       const targetUnitId = data.targetUnitId && data.targetUnitId.length > 0 ? data.targetUnitId : null;
 
       // Classify the missile types (with robust alias support)
+      const isSamInterceptor = missileType === 'sam_interceptor';
       const isBallistic = missileType === 'missile_ballistic' || missileType === 'ballistic';
       const isHypersonic = missileType === 'missile_hypersonic' || missileType === 'hypersonic';
       const isCluster = missileType === 'missile_cluster' || missileType === 'cluster';
       const isAntiShip = missileType === 'missile_antiship' || missileType === 'antiship';
       const isBomb = missileType === 'bomb' || missileType === 'air_to_ground';
-      const isCruise = !isBallistic && !isHypersonic && !isCluster && !isAntiShip && !isBomb;
+      const isCruise = !isBallistic && !isHypersonic && !isCluster && !isAntiShip && !isBomb && !isSamInterceptor;
 
       const targetName = data.targetName || (targetUnitId ? 'Hostile Target' : (isBallistic ? 'Theater Strategic Target' : 'Designated Grid Coordinates'));
       const speedMach = data.speedMach || (isHypersonic ? 8.5 : (isBallistic ? 5.2 : (isAntiShip ? 2.4 : (isCluster ? 1.8 : (isBomb ? 0.45 : 0.85)))));
@@ -1033,6 +1050,18 @@
         `;
         markerIconSize = [26, 26];
         markerIconAnchor = [13, 13];
+      } else if (isSamInterceptor) {
+        // PATRIOT PAC-3 MSE Hypersonic ABM Interceptor
+        missileColor = '#00E5FF';
+        missileSvg = `
+          <svg viewBox="0 0 28 36" width="28" height="36" style="filter: drop-shadow(0 0 10px #00E5FF);">
+            <path d="M14 1 L17 8 L17 26 L20 30 L16 28 L14 30 L12 28 L8 30 L11 26 L11 8 Z" fill="#FFFFFF" stroke="#00E5FF" stroke-width="1.4"/>
+            <polygon points="14,28 16,35 14,38 12,35" fill="#00E5FF"/>
+            <circle cx="14" cy="28" r="2.5" fill="#30D158"/>
+          </svg>
+        `;
+        markerIconSize = [28, 36];
+        markerIconAnchor = [14, 18];
       } else {
         // Tomahawk / Cruise Missile / Fox-2 needle
         missileSvg = `
@@ -1072,21 +1101,12 @@
 
       const initialDistM = computeDistanceMeters(startLat, startLng, targetLat, targetLng);
 
-      // Duration tailored to velocity
-      let durationMs = 6500;
-      if (isHypersonic) {
-        durationMs = Math.min(4200, Math.max(2600, (initialDistM / 38000) * 1000 + 1800)); // blazing fast
-      } else if (isBallistic) {
-        durationMs = Math.min(8500, Math.max(5000, (initialDistM / 24000) * 1000 + 3000)); // smooth parabolic climb & dive
-      } else if (isBomb) {
-        durationMs = Math.min(9000, Math.max(3800, (initialDistM / 10000) * 1000 + 2200)); // subsonic gravity release
-      } else if (isCluster) {
-        durationMs = Math.min(7500, Math.max(4400, (initialDistM / 18000) * 1000 + 2400));
-      } else {
-        durationMs = Math.min(8800, Math.max(5200, (initialDistM / 16000) * 1000 + 3000)); // steady cruise
-      }
-
-      const startTime = performance.now();
+      // Realistic Mach velocity physics with RTS 4x time scaling: v_eff = speedMach * 340 m/s * 4.0
+      const effectiveSpeedMps = Math.max(120.0, speedMach * 340.0 * 4.0);
+      const computedDurationMs = Math.max(5000, Math.round((initialDistM / effectiveSpeedMps) * 1000));
+      const durationMs = (data.durationMs && data.durationMs > 0) ? data.durationMs : computedDurationMs;
+      const initialProgress = (data.progress != null) ? Number(data.progress) : 0.0;
+      const startTime = performance.now() - (initialProgress * durationMs);
       const trailPoints = [[startLat, startLng]];
 
       const missileObj = {
@@ -1286,8 +1306,12 @@
           map.removeLayer(missileMarker);
           map.removeLayer(trailLine);
 
-          // Impact shockwave tailored to missile class
-          triggerDetonationShockwave(missileObj.targetLat, missileObj.targetLng, missileObj);
+          // Impact shockwave or mid-air intercept burst
+          if (isSamInterceptor) {
+            triggerMidAirBurst(missileObj.targetLat, missileObj.targetLng);
+          } else {
+            triggerDetonationShockwave(missileObj.targetLat, missileObj.targetLng, missileObj);
+          }
 
           if (isTrackingMissile && trackedMissileId === id) {
             setTimeout(() => {
@@ -1395,6 +1419,39 @@
           map.removeLayer(blast);
         }
       }, 40);
+    }
+
+    window.destroyMissileInMidAir = function(id, midAirLat, midAirLng) {
+      const m = activeMissiles[id];
+      if (m) {
+        m.finished = true;
+        if (m.marker) map.removeLayer(m.marker);
+        if (m.trail) map.removeLayer(m.trail);
+        delete activeMissiles[id];
+      }
+      triggerMidAirBurst(midAirLat, midAirLng);
+    };
+
+    function triggerMidAirBurst(lat, lng) {
+      if (!map) return;
+      const flakRing = L.circle([lat, lng], {
+        radius: 25,
+        color: '#00E5FF',
+        weight: 3.5,
+        fillColor: '#FFD600',
+        fillOpacity: 0.85
+      }).addTo(map);
+
+      let f = 0;
+      const interval = setInterval(() => {
+        f++;
+        flakRing.setRadius(25 + f * 16);
+        flakRing.setStyle({ opacity: 1 - f / 10, fillOpacity: 0.85 * (1 - f / 10) });
+        if (f >= 10) {
+          clearInterval(interval);
+          map.removeLayer(flakRing);
+        }
+      }, 35);
     }
 
     // Detonation Blast & Expanding Shockwave Animation

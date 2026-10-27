@@ -380,3 +380,50 @@ data class MissileCatalogItem(
     val description: String,
     val trajectoryType: String
 )
+
+data class InFlightMissile(
+    val id: String,
+    val type: String,
+    val ownerId: String,
+    val team: String,
+    val startPos: GeoPoint,
+    var currentPos: GeoPoint,
+    val targetPos: GeoPoint,
+    val targetUnitId: String? = null,
+    val targetStructureId: String? = null,
+    val targetName: String = "",
+    val totalDistanceMeters: Double,
+    val speedMach: Double,
+    val speedMps: Double,
+    val totalFlightTimeSeconds: Double,
+    val launchedAt: Long = System.currentTimeMillis(),
+    var progress: Double = 0.0,
+    var finished: Boolean = false,
+    var intercepted: Boolean = false,
+    var interceptedBySamId: String? = null
+) {
+    fun toJsonObject(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("type", type)
+            put("ownerId", ownerId)
+            put("team", team)
+            put("startPos", startPos.toJsonObject())
+            put("currentPos", currentPos.toJsonObject())
+            put("targetPos", targetPos.toJsonObject())
+            if (targetUnitId != null) put("targetUnitId", targetUnitId)
+            if (targetStructureId != null) put("targetStructureId", targetStructureId)
+            put("targetName", targetName)
+            put("totalDistanceMeters", totalDistanceMeters)
+            put("speedMach", speedMach)
+            put("speedMps", speedMps)
+            put("totalFlightTimeSeconds", totalFlightTimeSeconds)
+            put("launchedAt", launchedAt)
+            put("progress", progress)
+            put("finished", finished)
+            put("intercepted", intercepted)
+            if (interceptedBySamId != null) put("interceptedBySamId", interceptedBySamId)
+        }
+    }
+}
+

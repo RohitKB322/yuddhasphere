@@ -283,6 +283,16 @@ class GameClient(
         send(json)
     }
 
+    fun sendMarketOrder(assetId: String, isBuy: Boolean, quantity: Int) {
+        val json = JSONObject().apply {
+            put("type", "MarketOrder")
+            put("assetId", assetId)
+            put("action", if (isBuy) "BUY" else "SELL")
+            put("quantity", quantity)
+        }
+        send(json)
+    }
+
     private fun send(json: JSONObject) {
         if (isConnected) {
             webSocket?.send(json.toString())

@@ -427,8 +427,18 @@ class LocalGameState(private val context: Context) {
                         maxPriceChangePercent = m.optDouble("maxPriceChangePercent", 5.0),
                         description = m.optString("description", "")
                     )
+                    var p = basePrice * 0.95
+                    for (h in 0..12) {
+                        p += (kotlin.random.Random.nextDouble(-1.0, 1.0) * (asset.maxPriceChangePercent / 100.0) * basePrice)
+                        p = p.coerceIn(basePrice * 0.75, basePrice * 1.35)
+                        asset.priceHistory.add(Math.round(p * 100.0) / 100.0)
+                    }
+                    asset.priceHistory.add(basePrice)
                     marketAssets[asset.id] = asset
                 }
+            }
+            if (marketAssets.isEmpty()) {
+                seedDefaultMarketAssets()
             }
             seedMarketNews()
         } catch (e: Exception) {
@@ -656,7 +666,7 @@ class LocalGameState(private val context: Context) {
 
         // 4. Market dynamic tick (every 5 seconds)
         marketTickCounter++
-        if (marketTickCounter % 5 == 0) {
+        if (marketTickCounter % 2 == 0) {
             updateMarketTick()
         }
     }
@@ -1579,6 +1589,120 @@ class LocalGameState(private val context: Context) {
             list.add(LeaderboardItem(5, "General Vane", "[NEX]", 48500, "Citadel Citadel L3", "player"))
         }
         return list
+    }
+
+    fun seedDefaultMarketAssets() {
+        if (marketAssets.isNotEmpty()) return
+
+        val defaults = listOf(
+            MarketAsset(
+                id = "comm_ore",
+                symbol = "ORE",
+                name = "Titanium Ore",
+                type = "commodity",
+                category = "Minerals",
+                basePrice = 120.0,
+                currentPrice = 122.5,
+                changePercent = 2.1,
+                maxPriceChangePercent = 4.0,
+                description = "Crucial titanium alloy ore used for airframe skin and hypersonic heat shielding."
+            ),
+            MarketAsset(
+                id = "comm_fuel",
+                symbol = "FUEL",
+                name = "Kerosene Jet Fuel",
+                type = "commodity",
+                category = "Energy",
+                basePrice = 85.0,
+                currentPrice = 86.8,
+                changePercent = 2.1,
+                maxPriceChangePercent = 5.0,
+                description = "High-octane aviation fuel required for rapid scrambled sorties and long-range cruise."
+            ),
+            MarketAsset(
+                id = "comm_steel",
+                symbol = "STEEL",
+                name = "Industrial Steel",
+                type = "commodity",
+                category = "Metals",
+                basePrice = 240.0,
+                currentPrice = 238.0,
+                changePercent = -0.8,
+                maxPriceChangePercent = 3.5,
+                description = "Hardened reinforced steel used in fortress armor and deep subterranean silos."
+            ),
+            MarketAsset(
+                id = "comm_grain",
+                symbol = "GRAIN",
+                name = "Strategic Grain",
+                type = "commodity",
+                category = "Agriculture",
+                basePrice = 45.0,
+                currentPrice = 44.2,
+                changePercent = -1.8,
+                maxPriceChangePercent = 3.0,
+                description = "Long-shelf emergency food ration sustaining base personnel and war logistics."
+            ),
+            MarketAsset(
+                id = "stock_aegis",
+                symbol = "AEGIS",
+                name = "Aegis Defence Corp",
+                type = "company",
+                category = "Aerospace & Defense",
+                basePrice = 520.0,
+                currentPrice = 535.4,
+                changePercent = 3.0,
+                maxPriceChangePercent = 6.0,
+                description = "Primary contractor for theater air-defense radar systems and precision interceptors."
+            ),
+            MarketAsset(
+                id = "stock_skyforge",
+                symbol = "SKYD",
+                name = "SkyForge Aerospace",
+                type = "company",
+                category = "Defense Technology",
+                basePrice = 410.0,
+                currentPrice = 405.2,
+                changePercent = -1.2,
+                maxPriceChangePercent = 5.5,
+                description = "Pioneering manufacturer of twin-engine multirole stealth combat jets and drones."
+            ),
+            MarketAsset(
+                id = "stock_harbor",
+                symbol = "HRBR",
+                name = "Harbor & Sons",
+                type = "company",
+                category = "Logistics & Maritime",
+                basePrice = 310.0,
+                currentPrice = 318.6,
+                changePercent = 2.8,
+                maxPriceChangePercent = 4.5,
+                description = "Global logistics fleet securing maritime and aerial trade corridors."
+            ),
+            MarketAsset(
+                id = "stock_ironvale",
+                symbol = "IRNV",
+                name = "Ironvale Mining",
+                type = "company",
+                category = "Raw Materials",
+                basePrice = 180.0,
+                currentPrice = 177.5,
+                changePercent = -1.4,
+                maxPriceChangePercent = 4.5,
+                description = "Deep-crust heavy mining consortium extracting rare-earth missile guidance elements."
+            )
+        )
+
+        defaults.forEach { asset ->
+            var p = asset.basePrice * 0.95
+            for (i in 0..12) {
+                p += (kotlin.random.Random.nextDouble(-1.0, 1.0) * (asset.maxPriceChangePercent / 100.0) * asset.basePrice)
+                p = p.coerceIn(asset.basePrice * 0.75, asset.basePrice * 1.35)
+                asset.priceHistory.add(Math.round(p * 100.0) / 100.0)
+            }
+            asset.priceHistory.add(asset.currentPrice)
+            marketAssets[asset.id] = asset
+        }
     }
 
     private fun seedMarketNews() {

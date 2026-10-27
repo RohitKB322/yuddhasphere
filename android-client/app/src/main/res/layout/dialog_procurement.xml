@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_transparent_glass"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- TOP HEADER -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvProcurementCategoryIcon"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_accent_button"
+            android:gravity="center"
+            android:text="✈"
+            android:textColor="@color/bg_tactical_dark"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvProcurementTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="AIR COMBAT PROCUREMENT"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvProcurementSubtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Select aircraft to station in Airbase Hangar"
+                android:textColor="@color/accent_cyan"
+                android:textSize="10.5sp" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnCloseProcurement"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_glass_circle_btn"
+            android:src="@android:drawable/ic_menu_close_clear_cancel" />
+    </LinearLayout>
+
+    <!-- CAPACITY STATUS WARNING BANNER -->
+    <TextView
+        android:id="@+id/tvProcurementCapacityBanner"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_pill_stat"
+        android:fontFamily="sans-serif-bold"
+        android:padding="6dp"
+        android:text="SLOT CAPACITY: 2 / 4 BAYS OCCUPIED"
+        android:textColor="@color/accent_green"
+        android:textSize="11sp" />
+
+    <!-- SCROLLABLE LIST OF ITEMS -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="280dp"
+        android:layout_marginTop="8dp">
+
+        <LinearLayout
+            android:id="@+id/containerProcureItems"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <!-- BOTTOM DISMISS BUTTON -->
+    <Button
+        android:id="@+id/btnBottomCancelProcurement"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_secondary_button"
+        android:fontFamily="sans-serif-bold"
+        android:text="✕ DISMISS / RETURN TO MAP"
+        android:textColor="@color/white"
+        android:textSize="11sp" />
+
+</LinearLayout>

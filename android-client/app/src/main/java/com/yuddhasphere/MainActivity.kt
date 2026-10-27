@@ -33,7 +33,10 @@ import com.yuddhasphere.network.GameClient
 import com.yuddhasphere.state.LocalGameState
 import com.yuddhasphere.ui.BuildMenuSheet
 import com.yuddhasphere.ui.MarketSheet
+import android.widget.LinearLayout
+import android.widget.TextView
 import com.yuddhasphere.ui.MilitarySheet
+import com.yuddhasphere.ui.ProcurementSheet
 import com.yuddhasphere.ui.UnderProgressDialog
 import org.json.JSONObject
 import java.util.Locale
@@ -180,7 +183,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         // Bottom Nav Item 3: Market (GTX Global Tactical Exchange)
         binding.navMarket.setOnClickListener {
             hideAllCards()
-            MarketSheet(this, gameState).show()
+            showMarketScreen()
         }
 
         // Bottom Nav Item 4: Alliance (Full Screen Overlay)
@@ -202,7 +205,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
         // Wealth Details Button in Top HUD -> opens GTX Market & Portfolio
         binding.btnWealthDetails.setOnClickListener {
-            MarketSheet(this, gameState).show()
+            showMarketScreen()
         }
 
         // Recenter / Locate Me Button (in Top HUD)
@@ -250,29 +253,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
     private fun showMilitarySheetForAirbase(targetAirbaseId: String) {
         val airbase = gameState.structures.find { it.id == targetAirbaseId } ?: return
-        MilitarySheet(this, gameState) { selectedJetOrMunitionId ->
-            if (selectedJetOrMunitionId.startsWith("jet_")) {
-                val buyResult = gameState.buyJetForAirbase(airbase.id, selectedJetOrMunitionId)
-                if (buyResult.first) {
-                    gameClient.sendBuyItem(airbase.id, selectedJetOrMunitionId)
-                    showStructureInspector(airbase.id)
-                    Toast.makeText(this, "${buyResult.second} Bay #${airbase.hangarJets.size} ready!", Toast.LENGTH_SHORT).show()
-                } else {
-                    val readyJet = airbase.hangarJets.find { it.catalogId == selectedJetOrMunitionId && it.status == "Ready in Hangar" }
-                    if (readyJet != null) {
-                        promptSortieTargeting(airbase.id, readyJet.id, readyJet.name)
-                    } else {
-                        Toast.makeText(this, buyResult.second, Toast.LENGTH_LONG).show()
-                    }
-                }
-            } else {
-                val sam = gameState.structures.find { it.type == "sam" && it.online }
-                if (sam != null) {
-                    gameState.buySamMunitions(sam.id)
-                } else {
-                    Toast.makeText(this, "Build a SAM site first to equip interceptors!", Toast.LENGTH_SHORT).show()
-                }
-            }
+        ProcurementSheet(this, gameState, gameClient, airbase.id, "airbase") {
+            showStructureInspector(airbase.id)
         }.show()
     }
 
@@ -605,6 +587,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.cardCommanderProfile.visibility = View.GONE
         binding.overlayReportsScreen.visibility = View.GONE
         binding.overlayAllianceScreen.visibility = View.GONE
+        binding.overlayMarketScreen.visibility = View.GONE
         activeInspectedStructureId = null
         activeSelectedJetId = null
     }
@@ -896,13 +879,16 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                         topMargin = (6 * resources.displayMetrics.density).toInt()
                     }
                     setOnClickListener {
-                        val result = gameState.armSamSlot(s.id)
-                        if (result.first) {
+                        ProcurementSheet(this@MainActivity, gameState, gameClient, s.id, "sam") {
                             renderSamSlots(s)
-                        } else {
-                            Toast.makeText(this@MainActivity, result.second, Toast.LENGTH_SHORT).show()
-                        }
+                        }.show()
                     }
+                }
+
+                siloCard.setOnClickListener {
+                    ProcurementSheet(this@MainActivity, gameState, gameClient, s.id, "sam") {
+                        renderSamSlots(s)
+                    }.show()
                 }
 
                 siloCard.addView(tvTitle)
@@ -1005,13 +991,16 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                         topMargin = (6 * resources.displayMetrics.density).toInt()
                     }
                     setOnClickListener {
-                        val result = gameState.reloadMissileSilo(s.id)
-                        if (result.first) {
+                        ProcurementSheet(this@MainActivity, gameState, gameClient, s.id, "missile_silo") {
                             renderMissileSiloSlots(s)
-                        } else {
-                            Toast.makeText(this@MainActivity, result.second, Toast.LENGTH_SHORT).show()
-                        }
+                        }.show()
                     }
+                }
+
+                siloCard.setOnClickListener {
+                    ProcurementSheet(this@MainActivity, gameState, gameClient, s.id, "missile_silo") {
+                        renderMissileSiloSlots(s)
+                    }.show()
                 }
 
                 siloCard.addView(tvTitle)
@@ -1335,7 +1324,23 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onMarketUpdated(assets: List<com.yuddhasphere.models.MarketAsset>, holdings: Map<String, com.yuddhasphere.models.PortfolioHolding>) {
-        // Market tick processed authoritatively
+        runOnUiThread {
+            if (binding.overlayMarketScreen.visibility == View.VISIBLE) {
+                updateMarketPortfolioHeader()
+                if (activeMarketAssetId != null) {
+                    val asset = gameState.marketAssets[activeMarketAssetId]
+                    if (asset != null) {
+                        binding.tvLiveAssetPrice.text = "$%,.2f".format(asset.currentPrice)
+                        val isPos = asset.changePercent >= 0
+                        binding.tvLiveAssetChange.text = "%s%.1f%%".format(if (isPos) "+" else "", asset.changePercent)
+                        binding.tvLiveAssetChange.setTextColor(if (isPos) getColor(R.color.accent_green) else getColor(R.color.accent_orange))
+                        binding.chartLiveAsset.addLiveTick(asset.currentPrice)
+                        updateLiveTradePreview()
+                    }
+                }
+                updateMarketListPrices()
+            }
+        }
     }
 
     override fun onAlert(title: String, message: String) {
@@ -1371,7 +1376,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 put("speedMach", speedMach)
                 put("hitProbability", hitProbability)
             }
-            val script = "window.launchActiveMissile(${missileObj});"
+            val script = "window.launchActiveMissile(${missileObj}); window.trackMissile('${missileId}');"
             binding.mapWebView.evaluateJavascript(script, null)
         }
     }
@@ -1586,6 +1591,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnCloseReports.setOnClickListener {
             binding.overlayReportsScreen.visibility = View.GONE
         }
+        binding.btnBottomCancelReports.setOnClickListener {
+            binding.overlayReportsScreen.visibility = View.GONE
+        }
         binding.btnNewsFilterAll.setOnClickListener { renderNewsFeed("all") }
         binding.btnNewsFilterWar.setOnClickListener { renderNewsFeed("combat") }
         binding.btnNewsFilterRadar.setOnClickListener { renderNewsFeed("radar") }
@@ -1595,6 +1603,12 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnCloseAlliance.setOnClickListener {
             binding.overlayAllianceScreen.visibility = View.GONE
         }
+        binding.btnBottomCancelAlliance.setOnClickListener {
+            binding.overlayAllianceScreen.visibility = View.GONE
+        }
+
+        // Market Overlay Controls
+        initMarketControls()
         binding.btnOpenCreateAlliance.setOnClickListener {
             binding.layoutCreateAllianceForm.visibility = View.VISIBLE
         }
@@ -2122,4 +2136,355 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             }
         }
     }
+
+    // =========================================================================
+    // GTX GLOBAL TACTICAL EXCHANGE (MARKET) ENGINE
+    // =========================================================================
+    private var selectedMarketCategory: String = "all"
+    private var activeMarketAssetId: String? = null
+    private var isTradeBuyMode: Boolean = true
+    private var selectedTradeQuantity: Int = 1
+
+    private fun initMarketControls() {
+        binding.btnCloseMarket.setOnClickListener {
+            binding.overlayMarketScreen.visibility = View.GONE
+        }
+        binding.btnBottomCancelMarket.setOnClickListener {
+            binding.overlayMarketScreen.visibility = View.GONE
+        }
+        binding.btnCloseLiveDetail.setOnClickListener {
+            binding.layoutLiveAssetDetailCard.visibility = View.GONE
+            activeMarketAssetId = null
+        }
+
+        binding.btnMarketFilterAll.setOnClickListener { setMarketFilter("all") }
+        binding.btnMarketFilterCommodities.setOnClickListener { setMarketFilter("commodity") }
+        binding.btnMarketFilterEquities.setOnClickListener { setMarketFilter("company") }
+        binding.btnMarketFilterPortfolio.setOnClickListener { setMarketFilter("portfolio") }
+
+        binding.btnLiveModeBuy.setOnClickListener { setTradeMode(true) }
+        binding.btnLiveModeSell.setOnClickListener { setTradeMode(false) }
+
+        binding.btnLiveQty1.setOnClickListener { setTradeQuantity(1) }
+        binding.btnLiveQty5.setOnClickListener { setTradeQuantity(5) }
+        binding.btnLiveQty10.setOnClickListener { setTradeQuantity(10) }
+        binding.btnLiveQty50.setOnClickListener { setTradeQuantity(50) }
+        binding.btnLiveQtyMax.setOnClickListener { setTradeQuantityMax() }
+
+        binding.btnExecuteLiveTrade.setOnClickListener { executeMarketTrade() }
+    }
+
+    private fun showMarketScreen() {
+        hideAllCards()
+        binding.overlayMarketScreen.visibility = View.VISIBLE
+        binding.tvMarketNewsTickerOverlay.isSelected = true
+        if (gameState.marketAssets.isEmpty()) {
+            gameState.seedDefaultMarketAssets()
+        }
+        renderMarketScreen()
+    }
+
+    private fun setMarketFilter(category: String) {
+        selectedMarketCategory = category
+        val tabs = listOf(
+            binding.btnMarketFilterAll to "all",
+            binding.btnMarketFilterCommodities to "commodity",
+            binding.btnMarketFilterEquities to "company",
+            binding.btnMarketFilterPortfolio to "portfolio"
+        )
+        tabs.forEach { (btn, cat) ->
+            if (cat == category) {
+                btn.setBackgroundResource(R.drawable.bg_accent_button)
+                btn.setTextColor(getColor(R.color.bg_tactical_dark))
+            } else {
+                btn.setBackgroundResource(R.drawable.bg_secondary_button)
+                btn.setTextColor(getColor(R.color.white))
+            }
+        }
+        renderMarketList()
+    }
+
+    private fun renderMarketScreen() {
+        setMarketFilter(selectedMarketCategory)
+        updateMarketPortfolioHeader()
+        renderMarketNewsTicker()
+    }
+
+    private fun updateMarketPortfolioHeader() {
+        val holdingsValue = gameState.getPortfolioValue()
+        val totalInvested = gameState.player.holdings.values.sumOf { it.totalInvested }
+        val pnl = holdingsValue - totalInvested
+        val pnlPercent = if (totalInvested > 0.0) (pnl / totalInvested) * 100.0 else 0.0
+
+        binding.tvMarketPortfolioWorth.text = "$%,.2f".format(holdingsValue)
+        val pnlSign = if (pnl >= 0.0) "+" else "-"
+        binding.tvMarketPortfolioPnL.text = "%s$%,.2f (%+.1f%%)".format(pnlSign, Math.abs(pnl), pnlPercent)
+        if (pnl >= 0.0) {
+            binding.tvMarketPortfolioPnL.setTextColor(getColor(R.color.accent_green))
+        } else {
+            binding.tvMarketPortfolioPnL.setTextColor(getColor(R.color.accent_orange))
+        }
+
+        binding.tvMarketCashBalance.text = "Cash: $%,d".format(gameState.player.wealth)
+        binding.tvMarketInvestedCapital.text = "Invested: $%,.2f".format(totalInvested)
+    }
+
+    private fun renderMarketNewsTicker() {
+        if (gameState.marketNews.isNotEmpty()) {
+            val headlineString = gameState.marketNews.take(6).joinToString("   ★   ") { it.headline }
+            binding.tvMarketNewsTickerOverlay.text = headlineString
+        }
+    }
+
+    private fun renderMarketList() {
+        binding.containerMarketList.removeAllViews()
+        val allAssets = gameState.marketAssets.values.toList()
+
+        val filtered = when (selectedMarketCategory) {
+            "commodity" -> allAssets.filter { it.type == "commodity" }
+            "company" -> allAssets.filter { it.type == "company" }
+            "portfolio" -> allAssets.filter { gameState.player.holdings.containsKey(it.id) }
+            else -> allAssets
+        }
+
+        if (filtered.isEmpty()) {
+            val tvEmpty = TextView(this).apply {
+                text = if (selectedMarketCategory == "portfolio") "No active stock or commodity positions held.\nBrowse Commodities or Equities to trade." else "No market assets available."
+                setTextColor(getColor(R.color.text_secondary))
+                textSize = 12f
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, (24 * resources.displayMetrics.density).toInt(), 0, (24 * resources.displayMetrics.density).toInt())
+            }
+            binding.containerMarketList.addView(tvEmpty)
+            return
+        }
+
+        filtered.forEach { asset ->
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = (8 * resources.displayMetrics.density).toInt()
+                }
+                setBackgroundResource(R.drawable.bg_glass_hud)
+                setPadding(
+                    (12 * resources.displayMetrics.density).toInt(),
+                    (10 * resources.displayMetrics.density).toInt(),
+                    (12 * resources.displayMetrics.density).toInt(),
+                    (10 * resources.displayMetrics.density).toInt()
+                )
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                tag = asset.id
+            }
+
+            val tvBadge = TextView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    (42 * resources.displayMetrics.density).toInt(),
+                    (42 * resources.displayMetrics.density).toInt()
+                )
+                gravity = android.view.Gravity.CENTER
+                setBackgroundResource(R.drawable.bg_secondary_button)
+                text = asset.symbol
+                setTextColor(getColor(R.color.accent_cyan))
+                textSize = 11.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+
+            val infoLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply {
+                    marginStart = (10 * resources.displayMetrics.density).toInt()
+                }
+            }
+
+            val tvName = TextView(this).apply {
+                text = asset.name
+                setTextColor(Color.WHITE)
+                textSize = 13.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+
+            val holding = gameState.player.holdings[asset.id]
+            val tvSubtitle = TextView(this).apply {
+                text = if (holding != null && holding.quantity > 0) {
+                    "${asset.category} • Owned: ${holding.quantity} ($%,.2f)".format(holding.quantity * asset.currentPrice)
+                } else {
+                    "${asset.category} • ${asset.type.capitalize(Locale.ROOT)}"
+                }
+                setTextColor(if (holding != null && holding.quantity > 0) getColor(R.color.accent_green) else getColor(R.color.text_secondary))
+                textSize = 10f
+            }
+
+            infoLayout.addView(tvName)
+            infoLayout.addView(tvSubtitle)
+
+            val priceLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = android.view.Gravity.END
+            }
+
+            val tvPrice = TextView(this).apply {
+                text = "$%,.2f".format(asset.currentPrice)
+                setTextColor(Color.WHITE)
+                textSize = 14f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                tag = "price_${asset.id}"
+            }
+
+            val isPos = asset.changePercent >= 0
+            val tvChange = TextView(this).apply {
+                text = "%s%.1f%%".format(if (isPos) "+" else "", asset.changePercent)
+                setTextColor(if (isPos) getColor(R.color.accent_green) else getColor(R.color.accent_orange))
+                textSize = 10.5f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                tag = "change_${asset.id}"
+            }
+
+            priceLayout.addView(tvPrice)
+            priceLayout.addView(tvChange)
+
+            card.addView(tvBadge)
+            card.addView(infoLayout)
+            card.addView(priceLayout)
+
+            card.setOnClickListener {
+                openLiveAssetDetail(asset.id)
+            }
+
+            binding.containerMarketList.addView(card)
+        }
+    }
+
+    private fun openLiveAssetDetail(assetId: String) {
+        val asset = gameState.marketAssets[assetId] ?: return
+        activeMarketAssetId = asset.id
+        binding.layoutLiveAssetDetailCard.visibility = View.VISIBLE
+
+        binding.tvLiveAssetSymbolBadge.text = asset.symbol
+        binding.tvLiveAssetName.text = asset.name
+        binding.tvLiveAssetCategory.text = "${asset.category} • ${asset.description}"
+        binding.tvLiveAssetPrice.text = "$%,.2f".format(asset.currentPrice)
+
+        val isPos = asset.changePercent >= 0
+        binding.tvLiveAssetChange.text = "%s%.1f%%".format(if (isPos) "+" else "", asset.changePercent)
+        binding.tvLiveAssetChange.setTextColor(if (isPos) getColor(R.color.accent_green) else getColor(R.color.accent_orange))
+
+        binding.chartLiveAsset.setAsset(asset)
+
+        setTradeMode(true)
+        setTradeQuantity(1)
+        updateLiveTradePreview()
+    }
+
+    private fun setTradeMode(isBuy: Boolean) {
+        isTradeBuyMode = isBuy
+        if (isBuy) {
+            binding.btnLiveModeBuy.setBackgroundResource(R.drawable.bg_accent_button)
+            binding.btnLiveModeBuy.setTextColor(getColor(R.color.bg_tactical_dark))
+            binding.btnLiveModeSell.setBackgroundResource(R.drawable.bg_secondary_button)
+            binding.btnLiveModeSell.setTextColor(getColor(R.color.accent_orange))
+            binding.btnExecuteLiveTrade.text = "CONFIRM BUY"
+            binding.btnExecuteLiveTrade.setBackgroundResource(R.drawable.bg_accent_button)
+            binding.btnExecuteLiveTrade.setTextColor(getColor(R.color.bg_tactical_dark))
+        } else {
+            binding.btnLiveModeBuy.setBackgroundResource(R.drawable.bg_secondary_button)
+            binding.btnLiveModeBuy.setTextColor(getColor(R.color.accent_cyan))
+            binding.btnLiveModeSell.setBackgroundResource(R.drawable.bg_danger_button)
+            binding.btnLiveModeSell.setTextColor(getColor(R.color.white))
+            binding.btnExecuteLiveTrade.text = "CONFIRM SELL"
+            binding.btnExecuteLiveTrade.setBackgroundResource(R.drawable.bg_danger_button)
+            binding.btnExecuteLiveTrade.setTextColor(getColor(R.color.white))
+        }
+        updateLiveTradePreview()
+    }
+
+    private fun setTradeQuantity(qty: Int) {
+        selectedTradeQuantity = qty.coerceAtLeast(1)
+        updateLiveTradePreview()
+    }
+
+    private fun setTradeQuantityMax() {
+        val asset = activeMarketAssetId?.let { gameState.marketAssets[it] } ?: return
+        if (isTradeBuyMode) {
+            val maxCanAfford = (gameState.player.wealth / asset.currentPrice).toInt().coerceAtLeast(1)
+            selectedTradeQuantity = maxCanAfford
+        } else {
+            val owned = gameState.player.holdings[asset.id]?.quantity ?: 0
+            selectedTradeQuantity = owned.coerceAtLeast(1)
+        }
+        updateLiveTradePreview()
+    }
+
+    private fun updateLiveTradePreview() {
+        val asset = activeMarketAssetId?.let { gameState.marketAssets[it] } ?: return
+        val holding = gameState.player.holdings[asset.id]
+        val ownedQty = holding?.quantity ?: 0
+        val avgPrice = holding?.avgCostBasis ?: 0.0
+        val positionVal = ownedQty * asset.currentPrice
+        val posPnL = positionVal - (holding?.totalInvested ?: 0.0)
+
+        binding.tvLiveAssetHoldingInfo.text = "Owned: $ownedQty shares • Position: $%,.2f • P&L: %s$%,.2f".format(
+            positionVal,
+            if (posPnL >= 0.0) "+" else "-",
+            Math.abs(posPnL)
+        )
+
+        val totalEst = asset.currentPrice * selectedTradeQuantity
+        if (isTradeBuyMode) {
+            val balanceAfter = (gameState.player.wealth - totalEst).toInt()
+            binding.tvLiveTradeCostPreview.text = "Total Cost: $%,.2f (%d @ $%,.2f)".format(totalEst, selectedTradeQuantity, asset.currentPrice)
+            binding.tvLiveCashAfterPreview.text = "Cash After: $%,d".format(balanceAfter)
+            if (balanceAfter < 0) {
+                binding.tvLiveCashAfterPreview.setTextColor(getColor(R.color.accent_red))
+            } else {
+                binding.tvLiveCashAfterPreview.setTextColor(getColor(R.color.text_secondary))
+            }
+        } else {
+            val balanceAfter = (gameState.player.wealth + totalEst).toInt()
+            binding.tvLiveTradeCostPreview.text = "Proceeds: $%,.2f (%d @ $%,.2f)".format(totalEst, selectedTradeQuantity, asset.currentPrice)
+            binding.tvLiveCashAfterPreview.text = "Cash After: $%,d".format(balanceAfter)
+            binding.tvLiveCashAfterPreview.setTextColor(getColor(R.color.text_secondary))
+        }
+    }
+
+    private fun executeMarketTrade() {
+        val assetId = activeMarketAssetId ?: return
+        val res = if (isTradeBuyMode) {
+            gameState.executeMarketBuy(assetId, selectedTradeQuantity)
+        } else {
+            gameState.executeMarketSell(assetId, selectedTradeQuantity)
+        }
+
+        if (res.first) {
+            gameClient.sendMarketOrder(assetId, isTradeBuyMode, selectedTradeQuantity)
+            Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
+            updateMarketPortfolioHeader()
+            updateLiveTradePreview()
+            renderMarketList()
+        } else {
+            Toast.makeText(this, res.second, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun updateMarketListPrices() {
+        gameState.marketAssets.values.forEach { asset ->
+            val tvPrice = binding.containerMarketList.findViewWithTag<TextView>("price_${asset.id}")
+            val tvChange = binding.containerMarketList.findViewWithTag<TextView>("change_${asset.id}")
+            if (tvPrice != null) {
+                tvPrice.text = "$%,.2f".format(asset.currentPrice)
+            }
+            if (tvChange != null) {
+                val isPos = asset.changePercent >= 0
+                tvChange.text = "%s%.1f%%".format(if (isPos) "+" else "", asset.changePercent)
+                tvChange.setTextColor(if (isPos) getColor(R.color.accent_green) else getColor(R.color.accent_orange))
+            }
+        }
+    }
+
 }

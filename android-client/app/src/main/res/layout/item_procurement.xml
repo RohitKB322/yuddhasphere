@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="10dp"
+    android:background="@drawable/bg_glass_card"
+    android:orientation="vertical"
+    android:padding="12dp">
+
+    <!-- TOP ROW: ICON, NAME, ROLE, COST -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/ivProcureIcon"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_secondary_button"
+            android:padding="5dp"
+            android:src="@drawable/ic_jet_f16" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvProcureName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-black"
+                android:text="F-16 Falcon"
+                android:textColor="@color/white"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvProcureRole"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Multi-role Fighter • Air Superiority"
+                android:textColor="@color/accent_cyan"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvProcureCost"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_badge_progress"
+            android:fontFamily="sans-serif-black"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="3dp"
+            android:text="$2,400"
+            android:textColor="@color/accent_orange"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- PAYLOAD / ARMAMENT INFO -->
+    <TextView
+        android:id="@+id/tvProcurePayload"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_pill_stat"
+        android:fontFamily="sans-serif-medium"
+        android:padding="6dp"
+        android:text="Payload: 2x AIM-120 AMRAAM • 2x GBU-12 Guided Bombs"
+        android:textColor="@color/white"
+        android:textSize="11sp" />
+
+    <!-- STATS ROW: RANGE & SPEED -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tvProcureRange"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Range: 2,800 km (Ferry)"
+            android:textColor="@color/text_secondary"
+            android:textSize="10.5sp" />
+
+        <TextView
+            android:id="@+id/tvProcureSpeed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Speed: Mach 2.05 (2,414 km/h)"
+            android:textColor="@color/text_secondary"
+            android:textSize="10.5sp" />
+    </LinearLayout>
+
+    <!-- ACTION BUTTON -->
+    <Button
+        android:id="@+id/btnProcureAction"
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_accent_button"
+        android:fontFamily="sans-serif-black"
+        android:text="🚀 PROCURE ($2,400)"
+        android:textColor="@color/bg_tactical_dark"
+        android:textSize="11.5sp" />
+
+</LinearLayout>

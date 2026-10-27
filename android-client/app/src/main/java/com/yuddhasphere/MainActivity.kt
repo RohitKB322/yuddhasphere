@@ -196,7 +196,6 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         // Recenter / Locate Me Button (in Top HUD)
         binding.btnRecenterGps.setOnClickListener {
             binding.mapWebView.evaluateJavascript("window.recenterMap();", null)
-            Toast.makeText(this, "Camera centered on Commander", Toast.LENGTH_SHORT).show()
         }
 
         // Commander HP / Avatar in Top HUD -> opens Commander Profile
@@ -204,9 +203,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             showCommanderProfileCard()
         }
 
-        // Alerts Button
+        // Alerts Button -> opens breaking war reports
         binding.btnAlerts.setOnClickListener {
-            Toast.makeText(this, "Airspace Status: Clear • All Defense Batteries Active", Toast.LENGTH_LONG).show()
+            hideAllCards()
+            showReportsScreen()
         }
 
         // Cancel Sortie Button
@@ -292,7 +292,6 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
         binding.btnPlaceAtGps.setOnClickListener {
             binding.mapWebView.evaluateJavascript("window.setPlacementToPlayerGps();", null)
-            Toast.makeText(this, "Target aligned to Commander GPS", Toast.LENGTH_SHORT).show()
         }
 
         binding.btnConfirmPlacement.setOnClickListener {
@@ -434,13 +433,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             val jetId = activeSelectedJetId ?: return@setOnClickListener
             val res = gameState.fireManualMissile(jetId)
             if (res.first) {
-                Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
                 val u = gameState.activeUnits.find { it.id == jetId }
                 if (u != null) {
                     showJetSortieControl(u.id)
                 }
-            } else {
-                Toast.makeText(this, res.second, Toast.LENGTH_LONG).show()
             }
         }
 
@@ -1067,10 +1063,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         binding.btnEngageSam.setOnClickListener {
             val res = gameState.fireSamAtTarget(u.id)
             if (res.first) {
-                Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
                 binding.cardHostileTargetInspector.visibility = View.GONE
-            } else {
-                Toast.makeText(this, res.second, Toast.LENGTH_LONG).show()
             }
         }
 
@@ -1080,10 +1073,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             if (friendlyFighter != null) {
                 val res = gameState.fireFox2AtTarget(friendlyFighter.id, u.id)
                 if (res.first) {
-                    Toast.makeText(this, res.second, Toast.LENGTH_SHORT).show()
                     binding.cardHostileTargetInspector.visibility = View.GONE
-                } else {
-                    Toast.makeText(this, res.second, Toast.LENGTH_LONG).show()
                 }
             } else {
                 // If no friendly jet in the air, check if airbase has ready fighter to scramble
@@ -1092,13 +1082,8 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 if (base != null && readyJet != null) {
                     val scrambleRes = gameState.launchSortieFromHangar(base.id, readyJet.id, u.position, null, "strike")
                     if (scrambleRes.first) {
-                        Toast.makeText(this, "Fighter scrambled from Airbase to intercept ${u.name}!", Toast.LENGTH_SHORT).show()
                         binding.cardHostileTargetInspector.visibility = View.GONE
-                    } else {
-                        Toast.makeText(this, scrambleRes.second, Toast.LENGTH_LONG).show()
                     }
-                } else {
-                    Toast.makeText(this, "No friendly fighters airborne or ready in Hangar! Procure a fighter at your Airbase.", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -1144,9 +1129,6 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         val result = gameState.launchSortieFromHangar(airbaseId, hangarJetId, target, targetStruct, order)
         if (result.first) {
             syncUnitsToMap()
-            Toast.makeText(this, "Air Sortie dispatched ($order)!", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(this, result.second, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -1202,12 +1184,11 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onAlert(title: String, message: String) {
-        Toast.makeText(this, "$title: $message", Toast.LENGTH_SHORT).show()
+        android.util.Log.d("YuddhaSphere", "Tactical Alert: $title - $message")
     }
 
     override fun onStructureUpgradeCompleted(structure: Structure) {
         syncWorldToMap()
-        Toast.makeText(this, "Upgrade Complete: ${structure.name} (L${structure.level})", Toast.LENGTH_LONG).show()
     }
 
     override fun onMissileFired(
@@ -1415,7 +1396,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onServerAlert(level: String, text: String) {
-        Toast.makeText(this, "[Server] $text", Toast.LENGTH_SHORT).show()
+        android.util.Log.d("YuddhaSphere", "[Server] $text")
     }
 
     private fun syncPlayerPositionToMap(autoRecenter: Boolean = false) {

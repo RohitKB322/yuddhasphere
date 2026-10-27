@@ -1063,14 +1063,6 @@
       }
     }
 
-      // GUARANTEED direct neutralization when intercepting target unit
-      if (missileObj && missileObj.targetUnitId) {
-        if (window.AndroidBridge && window.AndroidBridge.onUnitShotDown) {
-          window.AndroidBridge.onUnitShotDown(missileObj.targetUnitId, missileObj.targetName);
-        }
-      }
-    }
-
     // Backwards-compatible alias for simple calls
     window.animateMissileLaunch = function(startLat, startLng, endLat, endLng, missileType) {
       window.launchActiveMissile({

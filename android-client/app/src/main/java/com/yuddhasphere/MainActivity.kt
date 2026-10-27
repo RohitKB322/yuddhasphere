@@ -270,19 +270,27 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     private var pendingTargetingAirbaseId: String? = null
     private var pendingTargetingHangarJetId: String? = null
     private var pendingTargetingCruiseSiloId: String? = null
+    private var pendingTargetingMissileType: String? = null
 
-    private fun promptCruiseMissileTargeting(siloId: String) {
+    private fun promptMissileTargeting(siloId: String, missileType: String) {
         pendingTargetingCruiseSiloId = siloId
+        pendingTargetingMissileType = missileType
         binding.sortieTargetingBar.visibility = View.VISIBLE
         binding.bottomNavBar.visibility = View.GONE
-        binding.tvSortieHint.text = "🎯 Tap target on map (within 200km) to launch BrahMos-ER Cruise Missile"
+        val msl = gameState.getMissileInfo(missileType)
+        binding.tvSortieHint.text = "🎯 Tap target on map (within ${msl.rangeKm}km) to launch ${msl.name}"
         binding.mapWebView.evaluateJavascript("window.startSortieTargeting();", null)
+    }
+
+    private fun promptCruiseMissileTargeting(siloId: String) {
+        promptMissileTargeting(siloId, "missile_cruise")
     }
 
     private fun cancelSortieTargetingMode() {
         pendingTargetingAirbaseId = null
         pendingTargetingHangarJetId = null
         pendingTargetingCruiseSiloId = null
+        pendingTargetingMissileType = null
         isRetargetingMode = false
         binding.sortieTargetingBar.visibility = View.GONE
         binding.bottomNavBar.visibility = View.VISIBLE
@@ -902,13 +910,14 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     private fun renderMissileSiloSlots(s: Structure) {
         binding.containerSamSlots.removeAllViews()
         val maxSlots = s.maxMissileSlots()
-        binding.tvSamHeader.text = "🚀 STRATEGIC CRUISE MISSILE SILOS (${s.missileMunitions}/$maxSlots ARMED)"
+        val armedCount = s.equippedMissiles.size
+        binding.tvSamHeader.text = "🚀 STRATEGIC MISSILE SILOS ($armedCount/$maxSlots ARMED)"
 
         for (i in 0 until maxSlots) {
             val siloCard = android.widget.LinearLayout(this).apply {
                 orientation = android.widget.LinearLayout.VERTICAL
                 val params = android.widget.LinearLayout.LayoutParams(
-                    (135 * resources.displayMetrics.density).toInt(),
+                    (130 * resources.displayMetrics.density).toInt(),
                     android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
                     marginEnd = (8 * resources.displayMetrics.density).toInt()
@@ -922,41 +931,47 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 )
             }
 
-            if (i < s.missileMunitions) {
+            if (i < s.equippedMissiles.size) {
                 siloCard.setBackgroundResource(R.drawable.bg_slot_occupied)
+                val mslType = s.equippedMissiles[i]
+                val msl = gameState.getMissileInfo(mslType)
 
                 val tvTitle = android.widget.TextView(this).apply {
-                    text = "SILO #${i + 1} • BRAHMOS"
+                    text = "SILO #${i + 1} • ${msl.name.take(13).uppercase()}"
                     setTextColor(Color.WHITE)
-                    textSize = 10.5f
+                    textSize = 10f
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 }
                 val tvStatus = android.widget.TextView(this).apply {
                     text = "ARMED & READY"
                     setTextColor(Color.parseColor("#30D158"))
-                    textSize = 9.5f
+                    textSize = 9f
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 }
                 val tvRange = android.widget.TextView(this).apply {
-                    text = "Range: 200km • Mach 0.85"
+                    text = "${msl.rangeKm}km • Mach ${msl.speedMach}"
                     setTextColor(Color.parseColor("#8E8E93"))
                     textSize = 8.5f
                 }
                 val btnLaunch = android.widget.Button(this).apply {
-                    text = "🎯 TARGET LAUNCH"
+                    text = "🎯 LAUNCH"
                     textSize = 9.5f
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                     setTextColor(Color.parseColor("#070B14"))
                     setBackgroundResource(R.drawable.bg_accent_button)
                     layoutParams = android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                        (32 * resources.displayMetrics.density).toInt()
+                        (30 * resources.displayMetrics.density).toInt()
                     ).apply {
                         topMargin = (6 * resources.displayMetrics.density).toInt()
                     }
+                    includeFontPadding = false
+                    setPadding(0, 0, 0, 0)
+                    minHeight = 0
+                    minWidth = 0
                     setOnClickListener {
                         binding.cardStructureInspector.visibility = View.GONE
-                        promptCruiseMissileTargeting(s.id)
+                        promptMissileTargeting(s.id, mslType)
                     }
                 }
 
@@ -970,26 +985,30 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 val tvTitle = android.widget.TextView(this).apply {
                     text = "SILO #${i + 1} (EMPTY)"
                     setTextColor(Color.parseColor("#FF9F0A"))
-                    textSize = 10.5f
+                    textSize = 10f
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                 }
                 val tvDesc = android.widget.TextView(this).apply {
-                    text = "BrahMos-ER Cruise"
+                    text = "Tap to Arm Silo"
                     setTextColor(Color.parseColor("#8E8E93"))
                     textSize = 8.5f
                 }
                 val btnArm = android.widget.Button(this).apply {
-                    text = "RELOAD ($850)"
-                    textSize = 9.5f
+                    text = "+ ARM MISSILE"
+                    textSize = 9f
                     typeface = android.graphics.Typeface.DEFAULT_BOLD
                     setTextColor(Color.parseColor("#FF9F0A"))
                     setBackgroundResource(R.drawable.bg_secondary_button)
                     layoutParams = android.widget.LinearLayout.LayoutParams(
                         android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
-                        (32 * resources.displayMetrics.density).toInt()
+                        (30 * resources.displayMetrics.density).toInt()
                     ).apply {
                         topMargin = (6 * resources.displayMetrics.density).toInt()
                     }
+                    includeFontPadding = false
+                    setPadding(0, 0, 0, 0)
+                    minHeight = 0
+                    minWidth = 0
                     setOnClickListener {
                         ProcurementSheet(this@MainActivity, gameState, gameClient, s.id, "missile_silo") {
                             renderMissileSiloSlots(s)
@@ -1240,8 +1259,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     override fun onSortieTargetPicked(lat: Double, lng: Double, targetStructureId: String) {
         if (pendingTargetingCruiseSiloId != null) {
             val siloId = pendingTargetingCruiseSiloId!!
+            val mslType = pendingTargetingMissileType ?: "missile_cruise"
             cancelSortieTargetingMode()
-            val result = gameState.fireCruiseMissile(siloId, GeoPoint(lat, lng))
+            val result = gameState.fireSiloMissile(siloId, GeoPoint(lat, lng), mslType)
             if (!result.first) {
                 Toast.makeText(this, result.second, Toast.LENGTH_SHORT).show()
             }

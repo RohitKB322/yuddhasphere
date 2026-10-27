@@ -850,46 +850,107 @@
       if (!map) return;
 
       const id = data.id || ('msl_' + Math.random().toString(36).substring(2, 8));
-      const missileType = data.missileType || 'air_to_air';
-      const isCruise = missileType === 'strategic_cruise';
+      const missileType = data.missileType || 'missile_cruise';
       const startLat = data.fromLat;
       const startLng = data.fromLng;
       let targetLat = data.toLat;
       let targetLng = data.toLng;
       const targetUnitId = data.targetUnitId && data.targetUnitId.length > 0 ? data.targetUnitId : null;
-      const targetName = data.targetName || (targetUnitId ? 'Hostile Aircraft' : (isCruise ? 'Strategic Coordinates' : 'Designated Vector'));
-      const speedMach = data.speedMach || (isCruise ? 0.85 : 4.8);
-      const hitProbability = data.hitProbability || (isCruise ? 0.98 : 1.0);
 
-      const missileColor = isCruise ? '#FF9500' : (missileType === 'sam_interceptor' ? '#30D158' : (missileType === 'air_to_ground' ? '#FF453A' : '#00E5FF'));
-      const missileTitle = isCruise ? 'BRAHMOS-ER CRUISE MISSILE' : (missileType === 'sam_interceptor' ? 'PATRIOT PAC-3' : (missileType === 'air_to_ground' ? 'GBU-12 PAVEWAY' : 'AIM-120D AMRAAM'));
-      const guidanceType = isCruise ? 'GPS / TERCOM / ACTIVE RADAR' : (missileType === 'sam_interceptor' ? 'SURFACE-TO-AIR ACTIVE RADAR' : 'TERMINAL RADAR HOMING');
+      // Classify the 5 missile types
+      const isBallistic = missileType === 'missile_ballistic';
+      const isHypersonic = missileType === 'missile_hypersonic';
+      const isCluster = missileType === 'missile_cluster';
+      const isAntiShip = missileType === 'missile_antiship';
+      const isCruise = missileType === 'missile_cruise' || missileType === 'strategic_cruise';
 
-      // Clickable Needle Supersonic / Heavy Strategic Cruise Missile SVG
-      const missileSvg = isCruise ? `
-        <svg viewBox="0 0 28 28" width="28" height="28" style="filter: drop-shadow(0 0 8px #FF9500);">
-          <path d="M14 1 L17 7 L17 19 L21 23 L21 25 L16 22 L14 24 L12 22 L7 25 L7 23 L11 19 L11 7 Z" fill="#FFFFFF" stroke="#FF9500" stroke-width="1.3"/>
-          <circle cx="14" cy="25" r="3" fill="#FF3B30"/>
-        </svg>
-      ` : `
-        <svg viewBox="0 0 24 24" width="24" height="24" style="filter: drop-shadow(0 0 6px ${missileColor});">
-          <path d="M12 2 L14 8 L14 19 L16 22 L12 20 L8 22 L10 19 L10 8 Z" fill="#FFFFFF" stroke="${missileColor}" stroke-width="1.2"/>
-          <circle cx="12" cy="21" r="2.5" fill="#FFD600"/>
-        </svg>
-      `;
+      const targetName = data.targetName || (targetUnitId ? 'Hostile Target' : (isBallistic ? 'Theater Strategic Target' : 'Designated Grid Coordinates'));
+      const speedMach = data.speedMach || (isHypersonic ? 8.5 : (isBallistic ? 5.2 : (isAntiShip ? 2.4 : (isCluster ? 1.8 : 0.85))));
+      const hitProbability = data.hitProbability || 0.98;
+
+      // Color scheme
+      let missileColor = '#FF9500'; // cruise
+      if (isBallistic) missileColor = '#FF5722';
+      else if (isHypersonic) missileColor = '#00E5FF';
+      else if (isCluster) missileColor = '#FFCC00';
+      else if (isAntiShip) missileColor = '#30D158';
+      else if (missileType === 'sam_interceptor') missileColor = '#30D158';
+      else if (missileType === 'air_to_air') missileColor = '#00E5FF';
+
+      // Custom SVG icon tailored to each missile type
+      let missileSvg = '';
+      let markerIconSize = [28, 28];
+      let markerIconAnchor = [14, 14];
+
+      if (isBallistic) {
+        // Agni-II MRBM Heavy Rocket with glowing booster plume
+        missileSvg = `
+          <svg viewBox="0 0 32 32" width="30" height="30" style="filter: drop-shadow(0 0 10px #FF5722);">
+            <path d="M16 1 L19 8 L19 22 L23 27 L23 29 L18 27 L16 29 L14 27 L9 29 L9 27 L13 22 L13 8 Z" fill="#FFFFFF" stroke="#FF5722" stroke-width="1.3"/>
+            <polygon points="16,29 19,34 16,36 13,34" fill="#FFD600"/>
+            <circle cx="16" cy="28" r="3" fill="#FF3D00"/>
+          </svg>
+        `;
+        markerIconSize = [30, 30];
+        markerIconAnchor = [15, 15];
+      } else if (isHypersonic) {
+        // DF-17 Waverider Glider with plasma ion wash
+        missileSvg = `
+          <svg viewBox="0 0 32 32" width="30" height="30" style="filter: drop-shadow(0 0 10px #00E5FF);">
+            <path d="M16 2 L22 18 L26 26 L22 28 L16 24 L10 28 L6 26 L10 18 Z" fill="#E0FBFC" stroke="#00E5FF" stroke-width="1.4"/>
+            <polygon points="16,24 19,29 16,32 13,29" fill="#BF5AF2"/>
+            <circle cx="16" cy="24" r="2.5" fill="#00E5FF"/>
+          </svg>
+        `;
+        markerIconSize = [30, 30];
+        markerIconAnchor = [15, 15];
+      } else if (isCluster) {
+        // CBU-97 Submunition Dispenser
+        missileSvg = `
+          <svg viewBox="0 0 28 28" width="28" height="28" style="filter: drop-shadow(0 0 8px #FFCC00);">
+            <path d="M14 2 L17 8 L17 22 L20 25 L16 24 L14 26 L12 24 L8 25 L11 22 L11 8 Z" fill="#FFFDE7" stroke="#FFCC00" stroke-width="1.3"/>
+            <line x1="11" y1="12" x2="17" y2="12" stroke="#FF9500" stroke-width="1.6"/>
+            <line x1="11" y1="16" x2="17" y2="16" stroke="#FF9500" stroke-width="1.6"/>
+            <circle cx="14" cy="24" r="2.5" fill="#FF9500"/>
+          </svg>
+        `;
+      } else if (isAntiShip) {
+        // AGM-158C LRASM with 60° Active Forward Radar Seeker Cone
+        missileSvg = `
+          <svg viewBox="0 0 50 64" width="46" height="58" style="overflow: visible; filter: drop-shadow(0 0 8px #30D158);">
+            <!-- Active 60-degree forward radar seeker cone -->
+            <path d="M25 22 L7 -18 A32 32 0 0 1 43 -18 Z" fill="rgba(48, 209, 88, 0.2)" stroke="#30D158" stroke-width="1.2" stroke-dasharray="3, 3"/>
+            <path d="M14 -6 A22 22 0 0 1 36 -6" fill="none" stroke="#30D158" stroke-width="1.2" opacity="0.7"/>
+            <line id="radar_beam_${id}" x1="25" y1="22" x2="25" y2="-20" stroke="#FFFFFF" stroke-width="1.8"/>
+            <!-- Missile Airframe -->
+            <path d="M25 22 L28 29 L28 44 L33 50 L33 53 L27 49 L25 51 L23 49 L17 53 L17 50 L22 44 L22 29 Z" fill="#FFFFFF" stroke="#30D158" stroke-width="1.3"/>
+            <circle cx="25" cy="51" r="2.5" fill="#30D158"/>
+          </svg>
+        `;
+        markerIconSize = [46, 58];
+        markerIconAnchor = [23, 44];
+      } else {
+        // Tomahawk / Cruise Missile / Fox-2 needle
+        missileSvg = `
+          <svg viewBox="0 0 28 28" width="28" height="28" style="filter: drop-shadow(0 0 8px ${missileColor});">
+            <path d="M14 1 L17 7 L17 19 L21 23 L21 25 L16 22 L14 24 L12 22 L7 25 L7 23 L11 19 L11 7 Z" fill="#FFFFFF" stroke="${missileColor}" stroke-width="1.3"/>
+            <circle cx="14" cy="25" r="3" fill="#FF3B30"/>
+          </svg>
+        `;
+      }
 
       const missileHtml = `
         <div class="tactical-missile-marker">
           ${missileSvg}
-          <div class="missile-hud-pill">MACH ${speedMach.toFixed(2)}</div>
+          <div class="missile-hud-pill" id="hud_pill_${id}">MACH ${speedMach.toFixed(1)}</div>
         </div>
       `;
 
       const missileIcon = L.divIcon({
         className: '',
         html: missileHtml,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
+        iconSize: markerIconSize,
+        iconAnchor: markerIconAnchor
       });
 
       const missileMarker = L.marker([startLat, startLng], {
@@ -900,15 +961,27 @@
 
       const trailLine = L.polyline([[startLat, startLng], [startLat, startLng]], {
         color: missileColor,
-        weight: 2.5,
-        opacity: 0.85,
-        dashArray: '3, 4'
+        weight: isHypersonic ? 3.5 : (isBallistic ? 3.0 : 2.5),
+        opacity: 0.88,
+        dashArray: isHypersonic ? null : '3, 4'
       }).addTo(map);
 
       const initialDistM = computeDistanceMeters(startLat, startLng, targetLat, targetLng);
-      // Realistic pacing: 4.5s to 8.5s across theater range
-      const durationMs = Math.min(8500, Math.max(4200, (initialDistM / 18000) * 1000 + 2600));
+
+      // Duration tailored to velocity
+      let durationMs = 6500;
+      if (isHypersonic) {
+        durationMs = Math.min(4200, Math.max(2600, (initialDistM / 38000) * 1000 + 1800)); // blazing fast
+      } else if (isBallistic) {
+        durationMs = Math.min(8000, Math.max(4800, (initialDistM / 22000) * 1000 + 2600)); // high arc
+      } else if (isCluster) {
+        durationMs = Math.min(7500, Math.max(4400, (initialDistM / 18000) * 1000 + 2400));
+      } else {
+        durationMs = Math.min(8800, Math.max(5200, (initialDistM / 16000) * 1000 + 3000)); // steady cruise
+      }
+
       const startTime = performance.now();
+      const trailPoints = [[startLat, startLng]];
 
       const missileObj = {
         id: id,
@@ -927,12 +1000,13 @@
         targetLng: targetLng,
         startTime: startTime,
         durationMs: durationMs,
-        finished: false
+        finished: false,
+        dispensed: false
       };
 
       activeMissiles[id] = missileObj;
 
-      // CLICK HANDLER: Open Tactical HUD Telemetry on Missile
+      // Click telemetry HUD
       missileMarker.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
         const now = performance.now();
@@ -940,13 +1014,12 @@
         const etaSec = Math.max(0, (missileObj.durationMs - elapsed) / 1000);
         const distRemainingKm = computeDistanceMeters(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng) / 1000;
 
-        // No large bubble covering the map - directly update native transparent HUD dialog!
         if (window.AndroidBridge && window.AndroidBridge.onMissileClicked) {
           window.AndroidBridge.onMissileClicked(
             id,
             missileType,
             targetName,
-            speedMach,
+            missileObj.speedMach,
             etaSec,
             hitProbability,
             distRemainingKm
@@ -954,11 +1027,11 @@
         }
       });
 
-      // Frame-by-frame Smooth Flight & Dynamic Homing
+      // Frame-by-frame 60 FPS trajectory engine
       function step(now) {
         if (missileObj.finished) return;
 
-        // Dynamic Homing: continuously acquire live target aircraft coordinates!
+        // Dynamic Homing for anti-ship or air-to-air
         if (missileObj.targetUnitId && unitsCache) {
           const liveTarget = unitsCache.find(u => u.id === missileObj.targetUnitId);
           if (liveTarget && liveTarget.position) {
@@ -967,17 +1040,64 @@
           }
         }
 
-        const progress = Math.min(1.0, (now - startTime) / durationMs);
+        const t = Math.min(1.0, (now - startTime) / durationMs);
+
+        // Vector math from start to target
+        const dLat = missileObj.targetLat - missileObj.startLat;
+        const dLng = missileObj.targetLng - missileObj.startLng;
+        const totalDistDeg = Math.sqrt(dLat * dLat + dLng * dLng) || 0.0001;
+        const uLat = dLat / totalDistDeg;
+        const uLng = dLng / totalDistDeg;
+        const normLat = -uLng;
+        const normLng = uLat;
+
+        let curProgress = t;
+        let lateralOffset = 0;
+
+        if (isBallistic) {
+          // 1. BALLISTIC (Agni-II): Slow boost, gaining exponential speed on dive; Parabolic arc
+          curProgress = Math.pow(t, 2.1);
+          lateralOffset = Math.sin(curProgress * Math.PI) * (totalDistDeg * 0.16);
+          const dynamicMach = 1.2 + (curProgress * 4.3);
+          const hudPill = document.getElementById('hud_pill_' + id);
+          if (hudPill) hudPill.textContent = 'MACH ' + dynamicMach.toFixed(1);
+        } else if (isHypersonic) {
+          // 3. HYPERSONIC (DF-17): High-velocity cosine wave waverider path
+          curProgress = t;
+          const waveCycles = 4.0;
+          const envelope = Math.sin(curProgress * Math.PI);
+          lateralOffset = Math.sin(curProgress * Math.PI * 2 * waveCycles) * (totalDistDeg * 0.08) * envelope;
+        } else if (isCluster) {
+          // 4. CLUSTER (CBU-97): Dispenses 12 submunitions 5km prior to impact
+          curProgress = t;
+          const distRemaining = computeDistanceMeters(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng);
+          if ((distRemaining <= 5000 || curProgress >= 0.74) && !missileObj.dispensed) {
+            missileObj.dispensed = true;
+            missileObj.finished = true;
+            delete activeMissiles[id];
+
+            map.removeLayer(missileMarker);
+            map.removeLayer(trailLine);
+
+            // Trigger submunition cluster dispersion of 12 guided bomblets
+            triggerClusterDispersion(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng);
+            return;
+          }
+        } else {
+          // 2. CRUISE & ANTI-SHIP: Direct straight line terrain-hugging flight path
+          curProgress = t;
+        }
+
         const prevLat = missileObj.curLat;
         const prevLng = missileObj.curLng;
 
-        missileObj.curLat = missileObj.startLat + (missileObj.targetLat - missileObj.startLat) * progress;
-        missileObj.curLng = missileObj.startLng + (missileObj.targetLng - missileObj.startLng) * progress;
+        missileObj.curLat = missileObj.startLat + dLat * curProgress + normLat * lateralOffset;
+        missileObj.curLng = missileObj.startLng + dLng * curProgress + normLng * lateralOffset;
 
-        const dLat = missileObj.targetLat - missileObj.curLat;
-        const dLng = missileObj.targetLng - missileObj.curLng;
-        const distRemainingM = computeDistanceMeters(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng);
-        const headingDeg = (Math.atan2(dLng, dLat) * 180 / Math.PI + 360) % 360;
+        // Instantaneous heading along tangent vector
+        const stepDLat = missileObj.curLat - prevLat;
+        const stepDLng = missileObj.curLng - prevLng;
+        const headingDeg = (Math.atan2(stepDLng, stepDLat) * 180 / Math.PI + 360) % 360;
 
         missileMarker.setLatLng([missileObj.curLat, missileObj.curLng]);
         const markerEl = missileMarker.getElement();
@@ -986,12 +1106,21 @@
           if (wrapper) {
             wrapper.style.transform = `rotate(${headingDeg}deg)`;
           }
+
+          // 5. ANTI-SHIP: 60° Radar Seeker Beam dynamic sweep back and forth
+          if (isAntiShip) {
+            const beamEl = markerEl.querySelector('#radar_beam_' + id);
+            if (beamEl) {
+              const sweepAngle = Math.sin(now * 0.012) * 26; // sweeps +-26 deg across the 60 deg cone
+              beamEl.setAttribute('transform', `rotate(${sweepAngle} 25 22)`);
+            }
+          }
         }
 
-        trailLine.setLatLngs([
-          [missileObj.startLat, missileObj.startLng],
-          [missileObj.curLat, missileObj.curLng]
-        ]);
+        // Add to continuous visual trail
+        trailPoints.push([missileObj.curLat, missileObj.curLng]);
+        if (trailPoints.length > 70) trailPoints.shift();
+        trailLine.setLatLngs(trailPoints);
 
         // 60FPS Camera Follow Interceptor
         if (isTrackingMissile && trackedMissileId === id && map) {
@@ -1000,15 +1129,17 @@
           map.setView([missileObj.curLat - latOffset, missileObj.curLng], curZoom, { animate: false });
         }
 
-        // Terminal proximity impact: within 80 meters or full duration complete
-        if (progress >= 1.0 || (distRemainingM <= 80 && progress > 0.35)) {
+        const distRemainingM = computeDistanceMeters(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng);
+
+        // Detonation condition
+        if (curProgress >= 1.0 || (distRemainingM <= 80 && curProgress > 0.35)) {
           missileObj.finished = true;
           delete activeMissiles[id];
 
           map.removeLayer(missileMarker);
           map.removeLayer(trailLine);
 
-          // Direct impact detonation & shockwave
+          // Impact shockwave tailored to missile class
           triggerDetonationShockwave(missileObj.targetLat, missileObj.targetLng, missileObj);
 
           if (isTrackingMissile && trackedMissileId === id) {
@@ -1028,16 +1159,136 @@
       requestAnimationFrame(step);
     };
 
+    // Submunition Cluster Dispenser: Dispenses 12 smart bomblets across a wide perimeter
+    function triggerClusterDispersion(carrierLat, carrierLng, targetLat, targetLng) {
+      if (!map) return;
+
+      // Airburst Carrier Separation Flash
+      const burstFlash = L.circle([carrierLat, carrierLng], {
+        radius: 45,
+        color: '#FFD600',
+        weight: 3.5,
+        fillColor: '#FFFFFF',
+        fillOpacity: 0.95
+      }).addTo(map);
+      setTimeout(() => map.removeLayer(burstFlash), 450);
+
+      const numBomblets = 12;
+      for (let i = 0; i < numBomblets; i++) {
+        const angle = (i * 2 * Math.PI / numBomblets) + (Math.random() - 0.5) * 0.45;
+        const spreadRadiusMeters = 140 + Math.random() * 320;
+        const destLat = targetLat + (spreadRadiusMeters / 111000) * Math.cos(angle);
+        const destLng = targetLng + (spreadRadiusMeters / (111000 * Math.cos(targetLat * Math.PI / 180))) * Math.sin(angle);
+
+        const bombletSvg = `
+          <div style="transform: rotate(${angle * 180 / Math.PI}deg);">
+            <svg viewBox="0 0 16 16" width="14" height="14" style="filter: drop-shadow(0 0 4px #FFCC00);">
+              <circle cx="8" cy="8" r="4.5" fill="#FFCC00" stroke="#FFFFFF" stroke-width="1.2"/>
+              <line x1="8" y1="8" x2="8" y2="15" stroke="#FF9500" stroke-width="1.6"/>
+            </svg>
+          </div>
+        `;
+
+        const bombletIcon = L.divIcon({
+          className: '',
+          html: bombletSvg,
+          iconSize: [16, 16],
+          iconAnchor: [8, 8]
+        });
+
+        const bMarker = L.marker([carrierLat, carrierLng], { icon: bombletIcon, zIndexOffset: 2500 }).addTo(map);
+        const bTrail = L.polyline([[carrierLat, carrierLng], [carrierLat, carrierLng]], {
+          color: '#FFCC00',
+          weight: 1.5,
+          opacity: 0.75,
+          dashArray: '2, 3'
+        }).addTo(map);
+
+        const bStartTime = performance.now();
+        const bDuration = 1800 + Math.random() * 800; // slower submunition glide
+
+        function stepBomblet(now) {
+          const bt = Math.min(1.0, (now - bStartTime) / bDuration);
+          const curBLat = carrierLat + (destLat - carrierLat) * bt;
+          const curBLng = carrierLng + (destLng - carrierLng) * bt;
+
+          bMarker.setLatLng([curBLat, curBLng]);
+          bTrail.setLatLngs([[carrierLat, carrierLng], [curBLat, curBLng]]);
+
+          if (bt >= 1.0) {
+            map.removeLayer(bMarker);
+            map.removeLayer(bTrail);
+            triggerMiniDetonation(destLat, destLng);
+          } else {
+            requestAnimationFrame(stepBomblet);
+          }
+        }
+        requestAnimationFrame(stepBomblet);
+      }
+    }
+
+    // Mini Shockwave for each Cluster Submunition
+    function triggerMiniDetonation(lat, lng) {
+      if (!map) return;
+      const blast = L.circle([lat, lng], {
+        radius: 12,
+        color: '#FF9500',
+        weight: 2,
+        fillColor: '#FF3B30',
+        fillOpacity: 0.75
+      }).addTo(map);
+
+      let f = 0;
+      const interval = setInterval(() => {
+        f++;
+        blast.setRadius(12 + f * 5.5);
+        blast.setStyle({ opacity: 1 - f / 9, fillOpacity: 0.7 * (1 - f / 9) });
+        if (f >= 9) {
+          clearInterval(interval);
+          map.removeLayer(blast);
+        }
+      }, 40);
+    }
+
     // Detonation Blast & Expanding Shockwave Animation
     function triggerDetonationShockwave(lat, lng, missileObj) {
       if (!map) return;
-      const isCruise = missileObj && missileObj.type === 'strategic_cruise';
-      const blastRadiusMax = isCruise ? 450 : 220;
-      const maxFrames = isCruise ? 22 : 14;
+      const mType = missileObj ? missileObj.type : '';
+      const isBallistic = mType === 'missile_ballistic';
+      const isHypersonic = mType === 'missile_hypersonic';
+      const isAntiShip = mType === 'missile_antiship';
+      const isCruise = mType === 'missile_cruise' || mType === 'strategic_cruise';
+
+      let blastRadiusMax = 240;
+      let maxFrames = 16;
+      let shockwaveColor = '#00E5FF';
+      let shockwaveFill = '#FF453A';
+
+      if (isBallistic) {
+        blastRadiusMax = 520;
+        maxFrames = 26;
+        shockwaveColor = '#FFD600';
+        shockwaveFill = '#FF3D00';
+      } else if (isHypersonic) {
+        blastRadiusMax = 380;
+        maxFrames = 18;
+        shockwaveColor = '#00E5FF';
+        shockwaveFill = '#BF5AF2';
+      } else if (isAntiShip) {
+        blastRadiusMax = 340;
+        maxFrames = 20;
+        shockwaveColor = '#30D158';
+        shockwaveFill = '#00E5FF';
+      } else if (isCruise) {
+        blastRadiusMax = 420;
+        maxFrames = 22;
+        shockwaveColor = '#FF9500';
+        shockwaveFill = '#FF3B30';
+      }
 
       // 1. Core Fireball Flash
       const fireball = L.circle([lat, lng], {
-        radius: isCruise ? 25 : 14,
+        radius: isBallistic ? 32 : (isCruise ? 25 : 14),
         color: '#FFD600',
         weight: 3.5,
         fillColor: '#FFFFFF',
@@ -1046,16 +1297,16 @@
 
       // 2. High-Velocity Supersonic Shockwave Ring
       const shockwave = L.circle([lat, lng], {
-        radius: isCruise ? 30 : 18,
-        color: '#00E5FF',
+        radius: isBallistic ? 36 : (isCruise ? 30 : 18),
+        color: shockwaveColor,
         weight: 3.5,
-        fillColor: isCruise ? '#FF9500' : '#FF453A',
+        fillColor: shockwaveFill,
         fillOpacity: 0.5
       }).addTo(map);
 
       // 3. Secondary Thermal Blast Ring
       const secondaryWave = L.circle([lat, lng], {
-        radius: isCruise ? 18 : 10,
+        radius: isBallistic ? 22 : (isCruise ? 18 : 10),
         color: '#FF9F0A',
         weight: 2,
         fillColor: '#FF9F0A',

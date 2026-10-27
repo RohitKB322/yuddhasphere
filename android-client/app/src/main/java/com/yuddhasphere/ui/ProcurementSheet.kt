@@ -200,68 +200,69 @@ class ProcurementSheet(
                     ?: gameState.structures.find { it.type == "missile_silo" && it.online }
 
                 tvIcon.text = "🚀"
-                tvTitle.text = "STRATEGIC CRUISE MISSILE PROCUREMENT"
-                tvSubtitle.text = "Arm BrahMos-ER Heavy Strategic Cruise Missiles"
+                tvTitle.text = "STRATEGIC MISSILE PROCUREMENT MARKET"
+                tvSubtitle.text = "Procure Ballistic, Cruise, Hypersonic, Cluster & Seeker Missiles"
 
                 val maxSlots = silo?.maxMissileSlots() ?: 4
-                val armed = silo?.missileMunitions ?: 0
+                val armed = silo?.equippedMissiles?.size ?: (silo?.missileMunitions ?: 0)
                 val isFull = armed >= maxSlots
 
                 if (isFull) {
-                    tvBanner.text = "⚠️ SILOS FULL ($armed / $maxSlots ARMED)"
+                    tvBanner.text = "⚠️ MISSILE SILOS FULL ($armed / $maxSlots ARMED) — Upgrade Silo to expand"
                     tvBanner.setTextColor(context.getColor(R.color.accent_red))
                 } else {
-                    tvBanner.text = "✓ STRATEGIC SILOS: $armed / $maxSlots ARMED"
+                    tvBanner.text = "✓ SILO BAYS: $armed / $maxSlots ARMED"
                     tvBanner.setTextColor(context.getColor(R.color.accent_green))
                 }
 
-                // Cruise missile item
-                val itemView = LayoutInflater.from(context).inflate(R.layout.item_procurement, container, false)
-                val ivIcon = itemView.findViewById<ImageView>(R.id.ivProcureIcon)
-                val tvName = itemView.findViewById<TextView>(R.id.tvProcureName)
-                val tvRole = itemView.findViewById<TextView>(R.id.tvProcureRole)
-                val tvCost = itemView.findViewById<TextView>(R.id.tvProcureCost)
-                val tvPayload = itemView.findViewById<TextView>(R.id.tvProcurePayload)
-                val tvRange = itemView.findViewById<TextView>(R.id.tvProcureRange)
-                val tvSpeed = itemView.findViewById<TextView>(R.id.tvProcureSpeed)
-                val btnProcure = itemView.findViewById<Button>(R.id.btnProcureAction)
+                for (msl in gameState.missileCatalog) {
+                    val itemView = LayoutInflater.from(context).inflate(R.layout.item_procurement, container, false)
+                    val ivIcon = itemView.findViewById<ImageView>(R.id.ivProcureIcon)
+                    val tvName = itemView.findViewById<TextView>(R.id.tvProcureName)
+                    val tvRole = itemView.findViewById<TextView>(R.id.tvProcureRole)
+                    val tvCost = itemView.findViewById<TextView>(R.id.tvProcureCost)
+                    val tvPayload = itemView.findViewById<TextView>(R.id.tvProcurePayload)
+                    val tvRange = itemView.findViewById<TextView>(R.id.tvProcureRange)
+                    val tvSpeed = itemView.findViewById<TextView>(R.id.tvProcureSpeed)
+                    val btnProcure = itemView.findViewById<Button>(R.id.btnProcureAction)
 
-                ivIcon.setImageResource(R.drawable.ic_interceptor)
-                tvName.text = "BrahMos-ER Strategic Cruise Missile"
-                tvRole.text = "Heavy Ground-Attack Precision Cruise Missile"
-                tvCost.text = "$850 / Missile"
-                tvPayload.text = "Payload: 300kg Semi-Armor-Piercing • TERCOM / GPS Guidance"
-                tvRange.text = "Range: 200 km Strategic Reach"
-                tvSpeed.text = "Speed: Mach 0.85 (1,040 km/h Terrain Hugging)"
+                    ivIcon.setImageResource(R.drawable.ic_interceptor)
+                    tvName.text = msl.name
+                    tvRole.text = "${msl.role} • ${msl.guidance}"
+                    tvCost.text = "$%,d".format(msl.cost)
+                    tvPayload.text = "Payload: ${msl.payload}"
+                    tvRange.text = "Range: %,d km".format(msl.rangeKm)
+                    tvSpeed.text = "Speed: Mach %.2f".format(msl.speedMach)
 
-                if (isFull) {
-                    btnProcure.isEnabled = false
-                    btnProcure.text = "🔒 SILOS FULL ($armed/$maxSlots)"
-                    btnProcure.setBackgroundResource(R.drawable.bg_secondary_button)
-                    btnProcure.setTextColor(Color.GRAY)
-                } else if (gameState.player.wealth < 850) {
-                    btnProcure.isEnabled = false
-                    btnProcure.text = "INSUFFICIENT FUNDS ($850)"
-                    btnProcure.setBackgroundResource(R.drawable.bg_secondary_button)
-                    btnProcure.setTextColor(context.getColor(R.color.accent_red))
-                } else {
-                    btnProcure.isEnabled = true
-                    btnProcure.text = "🚀 RELOAD SILO ($850)"
-                    btnProcure.setOnClickListener {
-                        if (silo != null) {
-                            val res = gameState.reloadMissileSilo(silo.id)
-                            if (res.first) {
-                                Toast.makeText(context, "Loaded 1x BrahMos-ER into Silo #${silo.missileMunitions}!", Toast.LENGTH_SHORT).show()
-                                dialog?.dismiss()
-                                onSuccess?.invoke()
-                            } else {
-                                Toast.makeText(context, res.second, Toast.LENGTH_SHORT).show()
+                    if (isFull) {
+                        btnProcure.isEnabled = false
+                        btnProcure.text = "🔒 SILOS FULL ($armed/$maxSlots)"
+                        btnProcure.setBackgroundResource(R.drawable.bg_secondary_button)
+                        btnProcure.setTextColor(Color.GRAY)
+                    } else if (gameState.player.wealth < msl.cost) {
+                        btnProcure.isEnabled = false
+                        btnProcure.text = "INSUFFICIENT FUNDS ($%,d)".format(msl.cost)
+                        btnProcure.setBackgroundResource(R.drawable.bg_secondary_button)
+                        btnProcure.setTextColor(context.getColor(R.color.accent_red))
+                    } else {
+                        btnProcure.isEnabled = true
+                        btnProcure.text = "🚀 ARM SILO ($%,d)".format(msl.cost)
+                        btnProcure.setOnClickListener {
+                            if (silo != null) {
+                                val res = gameState.buyMissileForSilo(silo.id, msl.id)
+                                if (res.first) {
+                                    Toast.makeText(context, "${msl.name} loaded into Silo Bay #${silo.equippedMissiles.size}!", Toast.LENGTH_SHORT).show()
+                                    dialog?.dismiss()
+                                    onSuccess?.invoke()
+                                } else {
+                                    Toast.makeText(context, res.second, Toast.LENGTH_SHORT).show()
+                                }
                             }
                         }
                     }
-                }
 
-                container.addView(itemView)
+                    container.addView(itemView)
+                }
             }
         }
 

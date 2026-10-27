@@ -207,6 +207,19 @@ class LocalGameState(private val context: Context) {
                         samMunitions = sObj.optInt("samMunitions", 6),
                         missileMunitions = sObj.optInt("missileMunitions", 4)
                     )
+                    if (sObj.has("equippedMissiles")) {
+                        val mArr = sObj.getJSONArray("equippedMissiles")
+                        for (m in 0 until mArr.length()) {
+                            s.equippedMissiles.add(mArr.getString(m))
+                        }
+                    }
+                    if (s.type == "missile_silo" && s.equippedMissiles.isEmpty() && s.missileMunitions > 0) {
+                        val defaultTypes = listOf("missile_ballistic", "missile_cruise", "missile_hypersonic", "missile_cluster", "missile_antiship")
+                        for (i in 0 until s.missileMunitions.coerceAtMost(s.maxMissileSlots())) {
+                            s.equippedMissiles.add(defaultTypes[i % defaultTypes.size])
+                        }
+                    }
+
                     if (sObj.has("hangarJets")) {
                         val jArr = sObj.getJSONArray("hangarJets")
                         for (j in 0 until jArr.length()) {
@@ -1040,21 +1053,120 @@ class LocalGameState(private val context: Context) {
         return Pair(true, "AIM-120D AMRAAM launched!")
     }
 
-    fun fireCruiseMissile(siloId: String, targetPos: GeoPoint): Pair<Boolean, String> {
+    val missileCatalog: List<com.yuddhasphere.models.MissileCatalogItem> = listOf(
+        com.yuddhasphere.models.MissileCatalogItem(
+            id = "missile_ballistic",
+            name = "Agni-II Ballistic Missile",
+            role = "Medium-Range Ballistic Missile (MRBM)",
+            cost = 1200,
+            rangeKm = 350,
+            speedMach = 5.2,
+            payload = "1,000kg Thermobaric / High-Explosive Warhead",
+            guidance = "Inertial Navigation + Star Tracker Guidance",
+            description = "High-arc parabolic sub-orbital trajectory. Slow initial boost stage, accelerating exponentially on terminal descent.",
+            trajectoryType = "ballistic"
+        ),
+        com.yuddhasphere.models.MissileCatalogItem(
+            id = "missile_cruise",
+            name = "BGM-109 Tomahawk Cruise Missile",
+            role = "Subsonic Precision Land-Attack Cruise Missile",
+            cost = 750,
+            rangeKm = 250,
+            speedMach = 0.85,
+            payload = "450kg WDU-36/B High Explosive Warhead",
+            guidance = "TERCOM + DSMAC Digital Scene Matching",
+            description = "Low-altitude terrain-hugging straight-line flight path with pinpoint precision.",
+            trajectoryType = "cruise"
+        ),
+        com.yuddhasphere.models.MissileCatalogItem(
+            id = "missile_hypersonic",
+            name = "DF-17 Hypersonic Glide Vehicle",
+            role = "Boost-Glide Waverider Hypersonic Weapon",
+            cost = 1800,
+            rangeKm = 400,
+            speedMach = 8.5,
+            payload = "High-Penetration Kinetic Energy Warhead",
+            guidance = "Atmospheric Waverider Cosine Glide Vectoring",
+            description = "Ultra-high velocity wave-skipping flight executing cosine-wave evasive maneuvers to penetrate all known SAM shields.",
+            trajectoryType = "hypersonic"
+        ),
+        com.yuddhasphere.models.MissileCatalogItem(
+            id = "missile_cluster",
+            name = "CBU-97 Sensor-Fused Cluster Missile",
+            role = "Wide-Area Submunition Dispenser Missile",
+            cost = 1100,
+            rangeKm = 200,
+            speedMach = 1.8,
+            payload = "12x BLU-108 Guided Submunition Skeets",
+            guidance = "Mid-Course Inertial + Terminal Area Airburst",
+            description = "Detonates 5km prior to impact, releasing 10-12 guided bomblets that fan out to blanket an entire enemy installation.",
+            trajectoryType = "cluster"
+        ),
+        com.yuddhasphere.models.MissileCatalogItem(
+            id = "missile_antiship",
+            name = "AGM-158C LRASM (Anti-Ship/Radar Seeker)",
+            role = "Long-Range Active Radar Homing Missile",
+            cost = 1400,
+            rangeKm = 300,
+            speedMach = 2.4,
+            payload = "450kg Penetrating Blast-Fragmentation Warhead",
+            guidance = "60° Active Millimeter-Wave Seeker Radar Sweep",
+            description = "Projects an active 60-degree radar seeker beam sweeping from the nose to acquire and track enemy naval and aerial vectors.",
+            trajectoryType = "antiship"
+        )
+    )
+
+    fun getMissileInfo(missileId: String): com.yuddhasphere.models.MissileCatalogItem {
+        return missileCatalog.find { it.id == missileId }
+            ?: missileCatalog[1]
+    }
+
+    fun buyMissileForSilo(siloId: String, missileCatalogId: String): Pair<Boolean, String> {
+        val silo = structures.find { it.id == siloId && it.type == "missile_silo" }
+            ?: return Pair(false, "Missile launcher facility not found.")
+        val msl = getMissileInfo(missileCatalogId)
+
+        if (silo.equippedMissiles.size >= silo.maxMissileSlots()) {
+            return Pair(false, "Missile Silo already at maximum capacity (${silo.equippedMissiles.size}/${silo.maxMissileSlots()}).")
+        }
+        if (player.wealth < msl.cost) {
+            return Pair(false, "Insufficient funds ($${player.wealth} < $${msl.cost} required for ${msl.name}).")
+        }
+
+        player.wealth -= msl.cost
+        silo.equippedMissiles.add(msl.id)
+        silo.missileMunitions = silo.equippedMissiles.size
+
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+            it.onAlert("SILO ARMED", "Armed Silo Bay #${silo.equippedMissiles.size} with 1x ${msl.name}.")
+        }
+        saveLocalWorld()
+        return Pair(true, "${msl.name} armed in Silo Bay #${silo.equippedMissiles.size}!")
+    }
+
+    fun fireSiloMissile(siloId: String, targetPos: GeoPoint, missileType: String): Pair<Boolean, String> {
         val silo = structures.find { it.id == siloId && it.type == "missile_silo" && it.online }
             ?: return Pair(false, "Missile launcher facility not found or offline.")
 
-        if (silo.missileMunitions <= 0) {
-            return Pair(false, "Silo depleted! Purchase BrahMos-ER Cruise Missile reload.")
-        }
-
+        val msl = getMissileInfo(missileType)
         val distM = GeoMath.calculateDistanceMeters(silo.position, targetPos)
-        if (distM > 200000.0) {
-            return Pair(false, "Target coordinates beyond 200km strategic range (${(distM / 1000).toInt()} km).")
+        val maxDistM = msl.rangeKm * 1000.0
+
+        if (distM > maxDistM) {
+            return Pair(false, "Target coordinates beyond ${msl.rangeKm}km operational range (${(distM / 1000).toInt()} km).")
         }
 
-        silo.missileMunitions -= 1
-        val mslId = "cruise_" + UUID.randomUUID().toString().take(6)
+        if (silo.equippedMissiles.isEmpty()) {
+            return Pair(false, "Missile Silo empty! Procure missiles from the Missile Market.")
+        }
+
+        val idx = silo.equippedMissiles.indexOf(missileType).let { if (it >= 0) it else 0 }
+        val launchedType = silo.equippedMissiles.removeAt(idx)
+        silo.missileMunitions = silo.equippedMissiles.size
+
+        val mslId = "${launchedType}_" + UUID.randomUUID().toString().take(6)
         listeners.forEach {
             it.onStructuresUpdated(structures)
             it.onMissileFired(
@@ -1063,39 +1175,24 @@ class LocalGameState(private val context: Context) {
                 fromLng = silo.position.lng,
                 toLat = targetPos.lat,
                 toLng = targetPos.lng,
-                missileType = "strategic_cruise",
+                missileType = launchedType,
                 targetUnitId = null,
-                targetName = "Strategic Grid Target [${(distM / 1000).toInt()} km]",
-                speedMach = 0.85,
+                targetName = "${msl.name} Target [${(distM / 1000).toInt()} km]",
+                speedMach = msl.speedMach,
                 hitProbability = 0.98
             )
-            it.onAlert("CRUISE MISSILE LAUNCHED", "Heavy BrahMos-ER Cruise Missile launched from Silo towards target!")
+            it.onAlert("MISSILE LAUNCHED", "${msl.name} launched from Silo towards target!")
         }
         saveLocalWorld()
-        return Pair(true, "BrahMos-ER Cruise Missile launched!")
+        return Pair(true, "${msl.name} launched!")
+    }
+
+    fun fireCruiseMissile(siloId: String, targetPos: GeoPoint): Pair<Boolean, String> {
+        return fireSiloMissile(siloId, targetPos, "missile_cruise")
     }
 
     fun reloadMissileSilo(siloId: String): Pair<Boolean, String> {
-        val silo = structures.find { it.id == siloId && it.type == "missile_silo" }
-            ?: return Pair(false, "Missile launcher facility not found.")
-
-        val cost = 850
-        if (player.wealth < cost) {
-            return Pair(false, "Insufficient funds ($$cost needed for BrahMos-ER missile reload).")
-        }
-        if (silo.missileMunitions >= silo.maxMissileSlots()) {
-            return Pair(false, "Missile Silo already at maximum capacity (${silo.maxMissileSlots()}).")
-        }
-
-        player.wealth -= cost
-        silo.missileMunitions = (silo.missileMunitions + 1).coerceAtMost(silo.maxMissileSlots())
-        listeners.forEach {
-            it.onPlayerUpdated(player)
-            it.onStructuresUpdated(structures)
-            it.onAlert("SILO RELOADED", "Loaded 1x BrahMos-ER Cruise Missile into Silo (${silo.missileMunitions}/${silo.maxMissileSlots()}).")
-        }
-        saveLocalWorld()
-        return Pair(true, "Cruise missile reloaded.")
+        return buyMissileForSilo(siloId, "missile_cruise")
     }
 
     fun destroyUnitInCombat(unitId: String, unitName: String) {

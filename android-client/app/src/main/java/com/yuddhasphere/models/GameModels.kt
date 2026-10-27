@@ -86,8 +86,18 @@ data class Structure(
     var upgradeFinishedAt: Long? = null,
     val hangarJets: MutableList<HangarJetItem> = mutableListOf(),
     var samMunitions: Int = 6,
-    var missileMunitions: Int = 4
+    var missileMunitions: Int = 4,
+    val equippedMissiles: MutableList<String> = mutableListOf()
 ) {
+    init {
+        if (type == "missile_silo" && equippedMissiles.isEmpty() && missileMunitions > 0) {
+            val defaults = listOf("missile_ballistic", "missile_cruise", "missile_hypersonic", "missile_cluster", "missile_antiship")
+            for (i in 0 until missileMunitions.coerceAtMost(maxMissileSlots())) {
+                equippedMissiles.add(defaults[i % defaults.size])
+            }
+        }
+    }
+
     fun maxHangarSlots(): Int = when (level) {
         1 -> 3
         2 -> 6
@@ -129,6 +139,9 @@ data class Structure(
             put("hangarJets", jetsArr)
             put("samMunitions", samMunitions)
             put("missileMunitions", missileMunitions)
+            val mslArr = JSONArray()
+            equippedMissiles.forEach { mslArr.put(it) }
+            put("equippedMissiles", mslArr)
         }
     }
 }
@@ -347,4 +360,17 @@ data class MarketNewsItem(
     val timestamp: Long = System.currentTimeMillis(),
     val impactAssetId: String? = null,
     val isPositive: Boolean = true
+)
+
+data class MissileCatalogItem(
+    val id: String,
+    val name: String,
+    val role: String,
+    val cost: Int,
+    val rangeKm: Int,
+    val speedMach: Double,
+    val payload: String,
+    val guidance: String,
+    val description: String,
+    val trajectoryType: String
 )

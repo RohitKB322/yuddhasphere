@@ -570,18 +570,18 @@
 
     <!-- ========================================================================= -->
     <!-- 🔴 OVERLAY: 24/7 TACTICAL WAR WIRE & BREAKING NEWS BROADCAST (FULL SCREEN) -->
-    <!-- 2. IN-FLIGHT JET TACTICAL CONTROL CARD -->
+    <!-- 2. IN-FLIGHT JET TACTICAL CONTROL CARD (CLEAN UNCOMPRESSED HUD) -->
     <LinearLayout
         android:id="@+id/cardJetSortieControl"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="10dp"
-        android:layout_marginBottom="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="6dp"
         android:background="@drawable/bg_transparent_glass"
         android:elevation="20dp"
         android:orientation="vertical"
-        android:padding="10dp"
+        android:padding="8dp"
         android:visibility="gone"
         app:layout_constraintBottom_toTopOf="@id/bottomNavBar"
         app:layout_constraintStart_toStartOf="parent"
@@ -619,7 +619,7 @@
                         android:fontFamily="sans-serif-black"
                         android:text="F-15 Strike Eagle"
                         android:textColor="@color/white"
-                        android:textSize="13sp" />
+                        android:textSize="12sp" />
 
                     <TextView
                         android:id="@+id/tvJetFuelPercent"
@@ -629,7 +629,7 @@
                         android:fontFamily="sans-serif-black"
                         android:text="85%"
                         android:textColor="@color/accent_green"
-                        android:textSize="11sp" />
+                        android:textSize="10.5sp" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -644,7 +644,7 @@
                         android:fontFamily="sans-serif-bold"
                         android:text="PILOT: Maverick"
                         android:textColor="@color/accent_cyan"
-                        android:textSize="10sp" />
+                        android:textSize="9.5sp" />
 
                     <TextView
                         android:id="@+id/tvJetControlStatus"
@@ -654,7 +654,7 @@
                         android:fontFamily="sans-serif-bold"
                         android:text="• PATROL"
                         android:textColor="@color/accent_orange"
-                        android:textSize="10sp" />
+                        android:textSize="9.5sp" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -672,8 +672,8 @@
             android:id="@+id/pbJetFuel"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="3.5dp"
-            android:layout_marginTop="4dp"
+            android:layout_height="3dp"
+            android:layout_marginTop="3dp"
             android:max="100"
             android:progress="85"
             android:progressTint="@color/accent_green" />
@@ -685,77 +685,102 @@
             android:layout_height="wrap_content"
             android:visibility="gone" />
 
-        <!-- Row 2: Speed Mode & Radar Arc Selector (In one compact row!) -->
+        <!-- Row 2: Speed Mode & Radar Arc Selector -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="4dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/btnSpeedSubsonic"
                 android:layout_width="0dp"
-                android:layout_height="26dp"
+                android:layout_height="25dp"
                 android:layout_marginEnd="3dp"
-                android:layout_weight="1.2"
+                android:layout_weight="1.1"
                 android:background="@drawable/bg_accent_button"
                 android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="SUBSONIC"
                 android:textColor="@color/bg_tactical_dark"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnSpeedSupersonic"
                 android:layout_width="0dp"
-                android:layout_height="26dp"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1.2"
+                android:layout_height="25dp"
+                android:layout_marginEnd="5dp"
+                android:layout_weight="1.1"
                 android:background="@drawable/bg_secondary_button"
                 android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="SUPER"
                 android:textColor="@color/accent_orange"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnRadarArc30"
                 android:layout_width="0dp"
-                android:layout_height="26dp"
+                android:layout_height="25dp"
                 android:layout_marginEnd="2dp"
-                android:layout_weight="1"
+                android:layout_weight="0.9"
                 android:background="@drawable/bg_secondary_button"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="30°"
                 android:textColor="@color/white"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnRadarArc60"
                 android:layout_width="0dp"
-                android:layout_height="26dp"
+                android:layout_height="25dp"
                 android:layout_marginEnd="2dp"
-                android:layout_weight="1"
+                android:layout_weight="0.9"
                 android:background="@drawable/bg_accent_button"
                 android:fontFamily="sans-serif-black"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="60°"
                 android:textColor="@color/bg_tactical_dark"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnRadarArc90"
                 android:layout_width="0dp"
-                android:layout_height="26dp"
-                android:layout_weight="1"
+                android:layout_height="25dp"
+                android:layout_weight="0.9"
                 android:background="@drawable/bg_secondary_button"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="90°"
                 android:textColor="@color/white"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
         </LinearLayout>
 
-        <!-- Row 3: Tactics ROE Selection (Compact 24dp) -->
+        <!-- Row 3: Tactics ROE Selection -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
+            android:layout_marginTop="4dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -766,9 +791,14 @@
                 android:layout_marginEnd="3dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_secondary_button"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="🎯 Aggressive"
                 android:textColor="@color/accent_orange"
-                android:textSize="9sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnRoeFireAtWill"
@@ -778,9 +808,14 @@
                 android:layout_weight="1"
                 android:background="@drawable/bg_accent_button"
                 android:fontFamily="sans-serif-black"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="⚔ Fire at Will"
                 android:textColor="@color/bg_tactical_dark"
-                android:textSize="9sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnRoePeaceful"
@@ -788,37 +823,52 @@
                 android:layout_height="24dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_secondary_button"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="🕊 Hold Fire"
                 android:textColor="@color/text_secondary"
-                android:textSize="9sp" />
+                android:textSize="8.5sp" />
         </LinearLayout>
 
-        <!-- Row 4: Target Lock & Launch Fox-2 (In one row!) -->
+        <!-- Row 4: Target Lock & Launch Fox-2 -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="4dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/btnSelectTarget"
                 android:layout_width="0dp"
-                android:layout_height="30dp"
+                android:layout_height="28dp"
                 android:layout_weight="1.4"
                 android:background="@drawable/bg_secondary_button"
                 android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="🎯 LOCK TARGET"
                 android:textColor="@color/accent_cyan"
-                android:textSize="10.5sp" />
+                android:textSize="9.5sp" />
 
             <Button
                 android:id="@+id/btnClearTarget"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
                 android:layout_marginStart="4dp"
                 android:background="@drawable/bg_secondary_button"
                 android:fontFamily="sans-serif-black"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="✕"
                 android:textColor="@color/accent_red"
                 android:textSize="11sp"
@@ -827,14 +877,19 @@
             <Button
                 android:id="@+id/btnLaunchFoxTwo"
                 android:layout_width="0dp"
-                android:layout_height="30dp"
+                android:layout_height="28dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1.2"
                 android:background="@drawable/bg_accent_button"
                 android:fontFamily="sans-serif-black"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="🚀 FOX-2"
                 android:textColor="@color/bg_tactical_dark"
-                android:textSize="10.5sp" />
+                android:textSize="9.5sp" />
         </LinearLayout>
 
         <TextView
@@ -847,41 +902,56 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="4dp"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/btnAbortRtb"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="26dp"
                 android:layout_marginEnd="3dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_danger_button"
                 android:fontFamily="sans-serif-bold"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="ABORT &amp; RTB"
                 android:textColor="@color/accent_red"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnRetargetSortie"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="26dp"
                 android:layout_marginEnd="3dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_secondary_button"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="Re-Target"
                 android:textColor="@color/primary_neon"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
 
             <Button
                 android:id="@+id/btnSetPatrol"
                 android:layout_width="0dp"
-                android:layout_height="28dp"
+                android:layout_height="26dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_secondary_button"
+                android:gravity="center"
+                android:includeFontPadding="false"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp"
                 android:text="Patrol Orbit"
                 android:textColor="@color/white"
-                android:textSize="9.5sp" />
+                android:textSize="8.5sp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -2868,67 +2938,92 @@
                             android:textSize="11sp" />
                     </LinearLayout>
 
-                    <!-- QUANTITY PRESETS -->
+                    <!-- QUANTITY PRESETS (CLEAN & UNCOMPRESSED) -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
+                        android:layout_marginTop="8dp"
                         android:orientation="horizontal">
 
                         <Button
                             android:id="@+id/btnLiveQty1"
                             android:layout_width="0dp"
-                            android:layout_height="28dp"
-                            android:layout_marginEnd="3dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="4dp"
                             android:layout_weight="1"
                             android:background="@drawable/bg_secondary_button"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            android:padding="0dp"
                             android:text="1"
                             android:textColor="@color/white"
-                            android:textSize="10sp" />
+                            android:textSize="11sp" />
 
                         <Button
                             android:id="@+id/btnLiveQty5"
                             android:layout_width="0dp"
-                            android:layout_height="28dp"
-                            android:layout_marginEnd="3dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="4dp"
                             android:layout_weight="1"
                             android:background="@drawable/bg_secondary_button"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            android:padding="0dp"
                             android:text="5"
                             android:textColor="@color/white"
-                            android:textSize="10sp" />
+                            android:textSize="11sp" />
 
                         <Button
                             android:id="@+id/btnLiveQty10"
                             android:layout_width="0dp"
-                            android:layout_height="28dp"
-                            android:layout_marginEnd="3dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="4dp"
                             android:layout_weight="1"
                             android:background="@drawable/bg_secondary_button"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            android:padding="0dp"
                             android:text="10"
                             android:textColor="@color/white"
-                            android:textSize="10sp" />
+                            android:textSize="11sp" />
 
                         <Button
                             android:id="@+id/btnLiveQty50"
                             android:layout_width="0dp"
-                            android:layout_height="28dp"
-                            android:layout_marginEnd="3dp"
+                            android:layout_height="32dp"
+                            android:layout_marginEnd="4dp"
                             android:layout_weight="1"
                             android:background="@drawable/bg_secondary_button"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            android:padding="0dp"
                             android:text="50"
                             android:textColor="@color/white"
-                            android:textSize="10sp" />
+                            android:textSize="11sp" />
 
                         <Button
                             android:id="@+id/btnLiveQtyMax"
                             android:layout_width="0dp"
-                            android:layout_height="28dp"
+                            android:layout_height="32dp"
                             android:layout_weight="1.2"
                             android:background="@drawable/bg_secondary_button"
                             android:fontFamily="sans-serif-black"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:minWidth="0dp"
+                            android:minHeight="0dp"
+                            android:padding="0dp"
                             android:text="MAX"
                             android:textColor="@color/accent_orange"
-                            android:textSize="10sp" />
+                            android:textSize="11sp" />
                     </LinearLayout>
 
                     <!-- ORDER PREVIEW & EXECUTION BUTTON -->

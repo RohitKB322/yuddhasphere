@@ -72,6 +72,9 @@ class PersistenceManager {
             return false;
         }
     }
+    setLoaded(loaded = true) {
+        this.loadSucceeded = loaded;
+    }
     saveWorld(world) {
         if (!this.loadSucceeded) {
             console.error('[Persistence] Save aborted: startup load previously failed. Protecting data.');

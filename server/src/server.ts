@@ -13,11 +13,12 @@ const persistence = new PersistenceManager();
 const gameLoop = new GameLoop(world, persistence);
 
 async function bootstrap() {
+  persistence.loadWorld(world);
   const dbConnected = await dbManager.connect();
   if (dbConnected) {
     await dbManager.loadWorldState(world);
-  } else {
-    persistence.loadWorld(world);
+    persistence.setLoaded(true);
+    persistence.saveWorld(world);
   }
   gameLoop.start();
 }
@@ -140,7 +141,7 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       const structId = `str_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
       const newStructure: Structure = {
         id: structId,
-        ownerId: player ? player.id : 'p_commander',
+        ownerId: player ? player.id : (playerId || 'p_commander'),
         ownerCallsign: player ? player.callsign : 'Commander',
         team: player ? player.team : 'blue',
         teamColor: player ? player.teamColor : '#00E5FF',
@@ -159,6 +160,8 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
 
       world.addStructure(newStructure);
       dbManager.saveStructure(newStructure);
+      persistence.saveWorld(world);
+      console.log(`[Server] Built & Persisted structure ${newStructure.name} (${newStructure.id}) for ${newStructure.ownerCallsign}`);
       world.reports.addReport('economy', `Construction Completed`, `Constructed ${newStructure.name} at coordinates.`, 'info');
 
       // Broadcast state difference to all connected players
@@ -175,6 +178,7 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       if (s) {
         s.level += 1;
         dbManager.saveStructure(s);
+        persistence.saveWorld(world);
         broadcast({
           type: 'StateDiff',
           serverTime: Date.now(),
@@ -187,6 +191,7 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
     case 'SellStructure': {
       world.removeStructure(command.structureId);
       dbManager.removeStructure(command.structureId);
+      persistence.saveWorld(world);
       broadcast({
         type: 'StateDiff',
         serverTime: Date.now(),

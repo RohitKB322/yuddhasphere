@@ -27,7 +27,7 @@ data class Player(
     var wealth: Int = 10000,
     var incomePerHour: Int = 100,
     var hp: Int = 1000,
-    val maxHp: Int = 1000,
+    var maxHp: Int = 1000,
     var allianceTag: String = "",
     var allianceId: String? = null,
     var allianceRole: String = "Member",

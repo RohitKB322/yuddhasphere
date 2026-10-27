@@ -86,14 +86,24 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             insets
         }
 
+        // Persistent unique device identity
+        val userIdKey = "device_user_id"
+        var userId = prefs.getString(userIdKey, null)
+        if (userId.isNullOrEmpty()) {
+            userId = "usr_" + java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+            prefs.edit().putString(userIdKey, userId).apply()
+        }
+
         gameState = LocalGameState(this)
+        gameState.player.id = userId
         loadSavedCommanderProfile()
         gameState.addListener(this)
 
         val savedHost = prefs.getString("server_host", "yuddhasphere-server.onrender.com") ?: "yuddhasphere-server.onrender.com"
         val savedPort = prefs.getString("server_port", "443") ?: "443"
         val initialUrl = buildServerUrl(savedHost, savedPort)
-        gameClient = GameClient(initialUrl, this)
+        val savedCallsign = prefs.getString("callsign", "Commander") ?: "Commander"
+        gameClient = GameClient(initialUrl, this, userId, savedCallsign)
         gameClient.connect(initialUrl)
 
         initMapWebView()
@@ -477,8 +487,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
 
                 gameState.updateCommanderProfile(callsign, finalTag, "#00E5FF")
                 val srvUrl = buildServerUrl(host, port)
+                val currentUid = prefs.getString("device_user_id", "usr_commander") ?: "usr_commander"
+                gameClient.updateCredentials(currentUid, callsign)
                 gameClient.connect(srvUrl)
-                gameClient.sendRegister("device_01", callsign)
                 binding.cardCommanderSetup.visibility = View.GONE
                 syncPlayerPositionToMap(autoRecenter = false)
                 Toast.makeText(this, "Settings saved. Connecting to $srvUrl...", Toast.LENGTH_SHORT).show()
@@ -1050,11 +1061,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     override fun onInitSyncReceived(player: Player, structures: List<Structure>) {
-        if (structures.isNotEmpty()) {
-            gameState.structures.clear()
-            gameState.structures.addAll(structures)
-            syncWorldToMap()
-        }
+        gameState.applyServerSync(player, structures)
+        syncWorldToMap()
+        syncPlayerPositionToMap(autoRecenter = false)
     }
 
     override fun onStateDiffReceived(diffJson: JSONObject) {
@@ -1085,7 +1094,17 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                 if (idx != -1) {
                     gameState.structures[idx] = s
                 } else {
-                    gameState.structures.add(s)
+                    // Match against optimistic local placement at identical coords
+                    val localMatchIdx = gameState.structures.indexOfFirst {
+                        it.type == s.type &&
+                        Math.abs(it.position.lat - s.position.lat) < 0.0001 &&
+                        Math.abs(it.position.lng - s.position.lng) < 0.0001
+                    }
+                    if (localMatchIdx != -1) {
+                        gameState.structures[localMatchIdx] = s
+                    } else {
+                        gameState.structures.add(s)
+                    }
                 }
                 worldChanged = true
             }
@@ -1102,6 +1121,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         }
 
         if (worldChanged) {
+            gameState.saveLocalWorld()
             syncWorldToMap()
         }
     }

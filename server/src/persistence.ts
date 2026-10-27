@@ -42,6 +42,10 @@ export class PersistenceManager {
     }
   }
 
+  public setLoaded(loaded: boolean = true): void {
+    this.loadSucceeded = loaded;
+  }
+
   public saveWorld(world: World): boolean {
     if (!this.loadSucceeded) {
       console.error('[Persistence] Save aborted: startup load previously failed. Protecting data.');

@@ -10,8 +10,8 @@ android {
         applicationId = "com.yuddhasphere"
         minSdk = 24
         targetSdk = 35
-        versionCode = 52
-        versionName = "0.5.2"
+        versionCode = 53
+        versionName = "0.5.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

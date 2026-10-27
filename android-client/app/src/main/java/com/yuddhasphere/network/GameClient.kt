@@ -11,7 +11,9 @@ import java.util.concurrent.TimeUnit
 
 class GameClient(
     private var serverUrl: String = "wss://yuddhasphere-server.onrender.com",
-    private val listener: NetworkListener
+    private val listener: NetworkListener,
+    var deviceId: String = "",
+    var callsign: String = "Commander"
 ) {
     interface NetworkListener {
         fun onConnectionStateChanged(connected: Boolean, statusText: String)
@@ -29,6 +31,14 @@ class GameClient(
     private var isConnected = false
     private var shouldReconnect = true
 
+    fun updateCredentials(newDeviceId: String, newCallsign: String) {
+        deviceId = newDeviceId
+        callsign = newCallsign
+        if (isConnected && deviceId.isNotEmpty()) {
+            sendRegister(deviceId, callsign)
+        }
+    }
+
     fun connect(url: String = serverUrl) {
         serverUrl = url
         shouldReconnect = true
@@ -40,6 +50,9 @@ class GameClient(
                 isConnected = true
                 mainHandler.post {
                     listener.onConnectionStateChanged(true, "ONLINE (Synced)")
+                }
+                if (deviceId.isNotEmpty()) {
+                    sendRegister(deviceId, callsign)
                 }
             }
 

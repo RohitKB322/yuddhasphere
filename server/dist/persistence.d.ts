@@ -6,6 +6,7 @@ export declare class PersistenceManager {
     private loadSucceeded;
     constructor(dataDir?: string);
     loadWorld(world: World): boolean;
+    setLoaded(loaded?: boolean): void;
     saveWorld(world: World): boolean;
     createHourlyBackup(world: World): void;
 }

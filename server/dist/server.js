@@ -14,12 +14,12 @@ const world = new world_1.World();
 const persistence = new persistence_1.PersistenceManager();
 const gameLoop = new gameloop_1.GameLoop(world, persistence);
 async function bootstrap() {
+    persistence.loadWorld(world);
     const dbConnected = await db_1.dbManager.connect();
     if (dbConnected) {
         await db_1.dbManager.loadWorldState(world);
-    }
-    else {
-        persistence.loadWorld(world);
+        persistence.setLoaded(true);
+        persistence.saveWorld(world);
     }
     gameLoop.start();
 }
@@ -132,7 +132,7 @@ function handleCommand(ws, command) {
             const structId = `str_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
             const newStructure = {
                 id: structId,
-                ownerId: player ? player.id : 'p_commander',
+                ownerId: player ? player.id : (playerId || 'p_commander'),
                 ownerCallsign: player ? player.callsign : 'Commander',
                 team: player ? player.team : 'blue',
                 teamColor: player ? player.teamColor : '#00E5FF',
@@ -150,6 +150,8 @@ function handleCommand(ws, command) {
             };
             world.addStructure(newStructure);
             db_1.dbManager.saveStructure(newStructure);
+            persistence.saveWorld(world);
+            console.log(`[Server] Built & Persisted structure ${newStructure.name} (${newStructure.id}) for ${newStructure.ownerCallsign}`);
             world.reports.addReport('economy', `Construction Completed`, `Constructed ${newStructure.name} at coordinates.`, 'info');
             // Broadcast state difference to all connected players
             broadcast({
@@ -164,6 +166,7 @@ function handleCommand(ws, command) {
             if (s) {
                 s.level += 1;
                 db_1.dbManager.saveStructure(s);
+                persistence.saveWorld(world);
                 broadcast({
                     type: 'StateDiff',
                     serverTime: Date.now(),
@@ -175,6 +178,7 @@ function handleCommand(ws, command) {
         case 'SellStructure': {
             world.removeStructure(command.structureId);
             db_1.dbManager.removeStructure(command.structureId);
+            persistence.saveWorld(world);
             broadcast({
                 type: 'StateDiff',
                 serverTime: Date.now(),

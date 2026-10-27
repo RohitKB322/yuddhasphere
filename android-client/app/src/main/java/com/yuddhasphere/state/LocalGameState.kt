@@ -7,6 +7,7 @@ import com.yuddhasphere.models.*
 import com.yuddhasphere.utils.GeoMath
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.io.InputStreamReader
 import java.util.UUID
 import kotlin.math.cos
@@ -47,9 +48,139 @@ class LocalGameState(private val context: Context) {
 
     init {
         loadCatalogsFromAssets()
-        initializeStarterBase()
+        val loaded = loadLocalWorld()
+        if (!loaded) {
+            initializeStarterBase()
+            saveLocalWorld()
+        }
         seedAlliancesAndReports()
         handler.postDelayed(tickRunnable, 1000)
+    }
+
+    fun saveLocalWorld() {
+        try {
+            val root = JSONObject()
+            val pObj = JSONObject().apply {
+                put("id", player.id)
+                put("callsign", player.callsign)
+                put("team", player.team)
+                put("teamColor", player.teamColor)
+                put("allianceTag", player.allianceTag)
+                put("wealth", player.wealth)
+                put("incomePerHour", player.incomePerHour)
+                put("hp", player.hp)
+                put("maxHp", player.maxHp)
+                val pos = JSONObject().apply {
+                    put("lat", player.position.lat)
+                    put("lng", player.position.lng)
+                }
+                put("position", pos)
+            }
+            root.put("player", pObj)
+
+            val sArr = JSONArray()
+            structures.forEach { s ->
+                val sObj = JSONObject().apply {
+                    put("id", s.id)
+                    put("ownerId", s.ownerId)
+                    put("team", s.team)
+                    put("teamColor", s.teamColor)
+                    put("type", s.type)
+                    put("name", s.name)
+                    put("level", s.level)
+                    put("hp", s.hp)
+                    put("maxHp", s.maxHp)
+                    put("radiusMeters", s.radiusMeters)
+                    put("radiusType", s.radiusType)
+                    put("online", s.online)
+                    val pos = JSONObject().apply {
+                        put("lat", s.position.lat)
+                        put("lng", s.position.lng)
+                    }
+                    put("position", pos)
+                }
+                sArr.put(sObj)
+            }
+            root.put("structures", sArr)
+
+            val file = File(context.filesDir, "world_cache.json")
+            file.writeText(root.toString())
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun loadLocalWorld(): Boolean {
+        try {
+            val file = File(context.filesDir, "world_cache.json")
+            if (!file.exists()) return false
+
+            val root = JSONObject(file.readText())
+            if (root.has("player")) {
+                val pObj = root.getJSONObject("player")
+                player.id = pObj.optString("id", player.id)
+                player.callsign = pObj.optString("callsign", player.callsign)
+                player.team = pObj.optString("team", player.team)
+                player.teamColor = pObj.optString("teamColor", player.teamColor)
+                player.allianceTag = pObj.optString("allianceTag", player.allianceTag)
+                player.wealth = pObj.optInt("wealth", player.wealth)
+                player.incomePerHour = pObj.optInt("incomePerHour", player.incomePerHour)
+                player.hp = pObj.optInt("hp", player.hp)
+                player.maxHp = pObj.optInt("maxHp", player.maxHp)
+                if (pObj.has("position")) {
+                    val posObj = pObj.getJSONObject("position")
+                    player.position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng"))
+                }
+            }
+
+            if (root.has("structures")) {
+                structures.clear()
+                val sArr = root.getJSONArray("structures")
+                for (i in 0 until sArr.length()) {
+                    val sObj = sArr.getJSONObject(i)
+                    val posObj = sObj.getJSONObject("position")
+                    structures.add(
+                        Structure(
+                            id = sObj.getString("id"),
+                            ownerId = sObj.optString("ownerId", player.id),
+                            team = sObj.optString("team", player.team),
+                            teamColor = sObj.optString("teamColor", player.teamColor),
+                            type = sObj.getString("type"),
+                            name = sObj.optString("name", "Structure"),
+                            level = sObj.optInt("level", 1),
+                            position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng")),
+                            hp = sObj.optInt("hp", 100),
+                            maxHp = sObj.optInt("maxHp", 100),
+                            radiusMeters = sObj.optDouble("radiusMeters", 150.0),
+                            radiusType = sObj.optString("radiusType", "influence"),
+                            online = sObj.optBoolean("online", true)
+                        )
+                    )
+                }
+                recalculateIncome()
+                return true
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return false
+    }
+
+    fun applyServerSync(srvPlayer: Player, srvStructures: List<Structure>) {
+        player.id = srvPlayer.id
+        player.wealth = srvPlayer.wealth
+        player.incomePerHour = srvPlayer.incomePerHour
+        player.hp = srvPlayer.hp
+        if (srvStructures.isNotEmpty()) {
+            structures.clear()
+            structures.addAll(srvStructures)
+        }
+        recalculateIncome()
+        saveLocalWorld()
+        listeners.forEach {
+            it.onPlayerUpdated(player)
+            it.onStructuresUpdated(structures)
+        }
     }
 
     fun addListener(listener: StateListener) {
@@ -627,6 +758,7 @@ class LocalGameState(private val context: Context) {
             it.onStructuresUpdated(structures)
             it.onAlert("Deployment Confirmed", "${cat.name} constructed successfully!")
         }
+        saveLocalWorld()
 
         return Pair(true, "Deployment successful.")
     }
@@ -680,6 +812,7 @@ class LocalGameState(private val context: Context) {
             it.onStructureUpgradeCompleted(s)
             it.onAlert("Upgrade Complete!", "${s.name} is now Level ${s.level}!")
         }
+        saveLocalWorld()
     }
 
     fun repairStructure(structureId: String): Pair<Boolean, String> {
@@ -699,6 +832,7 @@ class LocalGameState(private val context: Context) {
             it.onStructuresUpdated(structures)
             it.onAlert("Repairs Complete", "${s.name} fully restored to ${s.maxHp} HP.")
         }
+        saveLocalWorld()
         return Pair(true, "Repaired.")
     }
 
@@ -721,6 +855,7 @@ class LocalGameState(private val context: Context) {
             it.onStructuresUpdated(structures)
             it.onAlert("Structure Sold", "${s.name} decommissioned. +$$refund refunded.")
         }
+        saveLocalWorld()
         return Pair(true, "Sold for +$$refund.")
     }
 

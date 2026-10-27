@@ -59,6 +59,34 @@ server.listen(PORT, '0.0.0.0', () => {
 
 const clients = new Map<WebSocket, string>();
 
+const buildingCosts: Record<string, { cost: number; income: number }> = {
+  village: { cost: 350, income: 50 },
+  town: { cost: 800, income: 150 },
+  city: { cost: 2500, income: 400 },
+  metropolis: { cost: 8000, income: 1000 },
+  town_hall: { cost: 1500, income: 100 },
+  barracks: { cost: 600, income: 0 },
+  airbase: { cost: 1800, income: 0 },
+  port: { cost: 1200, income: 100 },
+  mine: { cost: 500, income: 120 },
+  sam: { cost: 900, income: 0 },
+  radar: { cost: 750, income: 0 },
+  wall: { cost: 150, income: 0 }
+};
+
+function recalculatePlayerIncome(player: Player): void {
+  let total = 100; // Base territory HQ income
+  for (const s of Object.values(world.state.structures)) {
+    if (s.ownerId === player.id && s.online) {
+      const meta = buildingCosts[s.type];
+      if (meta) {
+        total += meta.income * s.level;
+      }
+    }
+  }
+  player.incomePerHour = total;
+}
+
 function broadcast(msg: ServerMessage, excludeWs?: WebSocket) {
   const data = JSON.stringify(msg);
   for (const [clientWs] of clients) {
@@ -117,10 +145,13 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
         if (command.callsign && command.callsign.trim().length > 0) {
           player.callsign = command.callsign;
         }
+        // Authoritatively recalculate current income based on all owned active structures
+        recalculatePlayerIncome(player);
+
         player.isOnline = true;
         if (player.lastActive && now > player.lastActive) {
           const offlineHours = Math.min((now - player.lastActive) / 3600000, 168);
-          if (offlineHours > (1 / 60)) { // At least 1 min
+          if (offlineHours > 0.005) { // Accrue if away for > 18 seconds
             offlineEarned = Math.floor((player.incomePerHour || 100) * offlineHours);
             player.wealth = Math.floor(player.wealth || 0) + offlineEarned;
           }
@@ -148,7 +179,7 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
           text: `Welcome back, Commander! Your territory generated +$${offlineEarned} while you were offline.`
         }));
       }
-      console.log(`[Server] Commander registered: ${player.callsign} (${player.id}), wealth: $${Math.floor(player.wealth)}, structures: ${world.getStructures().length}`);
+      console.log(`[Server] Commander registered: ${player.callsign} (${player.id}), wealth: $${Math.floor(player.wealth)}, rate: +$${player.incomePerHour}/h, structures: ${world.getStructures().length}`);
       break;
     }
 
@@ -169,6 +200,12 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
       const playerId = clients.get(ws);
       const player = playerId ? world.getPlayer(playerId) : undefined;
       const structId = `str_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+      const meta = buildingCosts[command.structureType] || { cost: 300, income: 50 };
+
+      if (player) {
+        player.wealth = Math.max(0, (player.wealth || 10000) - meta.cost);
+      }
+
       const newStructure: Structure = {
         id: structId,
         ownerId: player ? player.id : (playerId || 'p_commander'),
@@ -185,20 +222,27 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
         radiusType: 'influence',
         online: true,
         createdAt: Date.now(),
-        slots: { storedUnits: [], queue: [] }
+        slots: { storedUnits: [], queue: [] },
+        hangarJets: [],
+        samMunitions: command.structureType === 'sam' ? 6 : 0
       };
 
       world.addStructure(newStructure);
+      if (player) {
+        recalculatePlayerIncome(player);
+        dbManager.savePlayer(player);
+      }
       dbManager.saveStructure(newStructure);
       persistence.saveWorld(world);
-      console.log(`[Server] Built & Persisted structure ${newStructure.name} (${newStructure.id}) for ${newStructure.ownerCallsign}`);
+      console.log(`[Server] Built structure ${newStructure.name} for ${newStructure.ownerCallsign}. Player wealth: $${player ? Math.floor(player.wealth) : 'N/A'}`);
       world.reports.addReport('economy', `Construction Completed`, `Constructed ${newStructure.name} at coordinates.`, 'info');
 
       // Broadcast state difference to all connected players
       broadcast({
         type: 'StateDiff',
         serverTime: Date.now(),
-        updatedStructures: [newStructure]
+        updatedStructures: [newStructure],
+        playerUpdate: player ? { wealth: Math.floor(player.wealth), incomePerHour: player.incomePerHour } : undefined
       });
       break;
     }
@@ -206,33 +250,69 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
     case 'UpgradeStructure': {
       const s = world.state.structures[command.structureId];
       if (s) {
+        const playerId = clients.get(ws);
+        const player = playerId ? world.getPlayer(playerId) : undefined;
+        const upgradeCost = s.level === 1 ? 800 : (s.level === 2 ? 2500 : 8000);
+        if (player) {
+          player.wealth = Math.max(0, (player.wealth || 0) - upgradeCost);
+          recalculatePlayerIncome(player);
+          dbManager.savePlayer(player);
+        }
         s.level += 1;
+        s.hp = s.maxHp = (s.maxHp || 200) + 150;
         dbManager.saveStructure(s);
         persistence.saveWorld(world);
         broadcast({
           type: 'StateDiff',
           serverTime: Date.now(),
-          updatedStructures: [s]
+          updatedStructures: [s],
+          playerUpdate: player ? { wealth: Math.floor(player.wealth), incomePerHour: player.incomePerHour } : undefined
         });
       }
       break;
     }
 
     case 'SellStructure': {
-      world.removeStructure(command.structureId);
-      dbManager.removeStructure(command.structureId);
-      persistence.saveWorld(world);
-      broadcast({
-        type: 'StateDiff',
-        serverTime: Date.now(),
-        removedStructureIds: [command.structureId]
-      });
+      const s = world.state.structures[command.structureId];
+      if (s) {
+        const playerId = clients.get(ws);
+        const player = playerId ? world.getPlayer(playerId) : undefined;
+        const refund = Math.floor((buildingCosts[s.type]?.cost || 300) * 0.5);
+        if (player) {
+          player.wealth = (player.wealth || 0) + refund;
+          recalculatePlayerIncome(player);
+          dbManager.savePlayer(player);
+        }
+        world.removeStructure(command.structureId);
+        dbManager.removeStructure(command.structureId);
+        persistence.saveWorld(world);
+        broadcast({
+          type: 'StateDiff',
+          serverTime: Date.now(),
+          removedStructureIds: [command.structureId],
+          playerUpdate: player ? { wealth: Math.floor(player.wealth), incomePerHour: player.incomePerHour } : undefined
+        });
+      }
       break;
     }
 
     case 'BuyItem': {
       const s = world.state.structures[command.structureId];
       if (s) {
+        const playerId = clients.get(ws);
+        const player = playerId ? world.getPlayer(playerId) : undefined;
+        const jetCosts: Record<string, number> = {
+          jet_f16: 900,
+          jet_mirage2000: 850,
+          jet_f15: 1200,
+          jet_su27: 1100,
+          jet_a10: 800
+        };
+        const cost = jetCosts[command.catalogId] || 800;
+        if (player) {
+          player.wealth = Math.max(0, (player.wealth || 0) - cost);
+          dbManager.savePlayer(player);
+        }
         if (!s.hangarJets) s.hangarJets = [];
         const jet = {
           id: `jet_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`,
@@ -249,7 +329,8 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
         broadcast({
           type: 'StateDiff',
           serverTime: Date.now(),
-          updatedStructures: [s]
+          updatedStructures: [s],
+          playerUpdate: player ? { wealth: Math.floor(player.wealth), incomePerHour: player.incomePerHour } : undefined
         });
       }
       break;
@@ -258,13 +339,20 @@ function handleCommand(ws: WebSocket, command: ClientCommand) {
     case 'RepairStructure': {
       const s = world.state.structures[command.structureId];
       if (s) {
+        const playerId = clients.get(ws);
+        const player = playerId ? world.getPlayer(playerId) : undefined;
+        if (player && player.wealth >= 50) {
+          player.wealth -= 50;
+          dbManager.savePlayer(player);
+        }
         s.hp = s.maxHp;
         dbManager.saveStructure(s);
         persistence.saveWorld(world);
         broadcast({
           type: 'StateDiff',
           serverTime: Date.now(),
-          updatedStructures: [s]
+          updatedStructures: [s],
+          playerUpdate: player ? { wealth: Math.floor(player.wealth), incomePerHour: player.incomePerHour } : undefined
         });
       }
       break;

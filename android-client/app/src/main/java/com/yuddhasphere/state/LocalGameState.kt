@@ -171,6 +171,14 @@ class LocalGameState(private val context: Context) {
         player.incomePerHour = srvPlayer.incomePerHour
         player.hp = srvPlayer.hp
         if (srvStructures.isNotEmpty()) {
+            srvStructures.forEach { srvS ->
+                if (srvS.hangarJets.isEmpty()) {
+                    val local = structures.find { it.id == srvS.id }
+                    if (local != null && local.hangarJets.isNotEmpty()) {
+                        srvS.hangarJets.addAll(local.hangarJets)
+                    }
+                }
+            }
             structures.clear()
             structures.addAll(srvStructures)
         }
@@ -197,11 +205,6 @@ class LocalGameState(private val context: Context) {
         try {
             val configStream = context.assets.open("config.json")
             val configJson = JSONObject(InputStreamReader(configStream).readText())
-
-            val gameObj = configJson.optJSONObject("game")
-            if (gameObj != null && player.wealth < 10000) {
-                player.wealth = gameObj.optInt("startingWealth", 10000)
-            }
 
             val settlements = configJson.getJSONObject("settlementChain")
             val keys = settlements.keys()

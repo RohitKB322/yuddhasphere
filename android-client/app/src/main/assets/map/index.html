@@ -738,6 +738,15 @@
       }
     };
 
+    window.panToCoordinates = function(lat, lng, zoom) {
+      if (!map) return;
+      if (zoom) {
+        map.flyTo([lat, lng], zoom, { duration: 0.6 });
+      } else {
+        map.panTo([lat, lng], { animate: true, duration: 0.5 });
+      }
+    };
+
     // Placement Mode Functions
     window.startPlacement = function(structureType, radiusMeters, radiusType) {
       if (!map) return;

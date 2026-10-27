@@ -215,33 +215,34 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
     }
 
     private fun showMilitarySheet() {
+        val airbase = gameState.structures.find { it.type == "airbase" && it.online }
+            ?: gameState.structures.find { it.type == "town_hall" }
+
+        if (airbase != null) {
+            showMilitarySheetForAirbase(airbase.id)
+        } else {
+            Toast.makeText(this, "Construct an Airbase first to procure and station fighter aircraft!", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun showMilitarySheetForAirbase(targetAirbaseId: String) {
+        val airbase = gameState.structures.find { it.id == targetAirbaseId } ?: return
         MilitarySheet(this, gameState) { selectedJetOrMunitionId ->
             if (selectedJetOrMunitionId.startsWith("jet_")) {
-                // Find Airbase
-                val airbase = gameState.structures.find { it.type == "airbase" && it.online }
-                    ?: gameState.structures.find { it.type == "town_hall" }
-
-                if (airbase != null) {
-                    // Purchase into hangar if not yet purchased
-                    val buyResult = gameState.buyJetForAirbase(airbase.id, selectedJetOrMunitionId)
-                    if (buyResult.first) {
-                        gameClient.sendBuyItem(airbase.id, selectedJetOrMunitionId)
-                        val newJet = airbase.hangarJets.last()
-                        promptSortieTargeting(airbase.id, newJet.id, newJet.name)
-                    } else {
-                        // If hangar already has this jet ready, scramble it
-                        val readyJet = airbase.hangarJets.find { it.catalogId == selectedJetOrMunitionId && it.status == "Ready in Hangar" }
-                        if (readyJet != null) {
-                            promptSortieTargeting(airbase.id, readyJet.id, readyJet.name)
-                        } else {
-                            Toast.makeText(this, buyResult.second, Toast.LENGTH_LONG).show()
-                        }
-                    }
+                val buyResult = gameState.buyJetForAirbase(airbase.id, selectedJetOrMunitionId)
+                if (buyResult.first) {
+                    gameClient.sendBuyItem(airbase.id, selectedJetOrMunitionId)
+                    showStructureInspector(airbase.id)
+                    Toast.makeText(this, "${buyResult.second} Bay #${airbase.hangarJets.size} ready!", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(this, "Build an Airbase first to store and launch fighter jets!", Toast.LENGTH_LONG).show()
+                    val readyJet = airbase.hangarJets.find { it.catalogId == selectedJetOrMunitionId && it.status == "Ready in Hangar" }
+                    if (readyJet != null) {
+                        promptSortieTargeting(airbase.id, readyJet.id, readyJet.name)
+                    } else {
+                        Toast.makeText(this, buyResult.second, Toast.LENGTH_LONG).show()
+                    }
                 }
             } else {
-                // Interceptor purchase
                 val sam = gameState.structures.find { it.type == "sam" && it.online }
                 if (sam != null) {
                     gameState.buySamMunitions(sam.id)
@@ -754,11 +755,13 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                     ).apply {
                         topMargin = (6 * resources.displayMetrics.density).toInt()
                     }
-                    setOnClickListener {
-                        binding.cardStructureInspector.visibility = View.GONE
-                        showMilitarySheet()
-                    }
                 }
+
+                val onEmptySlotClicked = View.OnClickListener {
+                    showMilitarySheetForAirbase(s.id)
+                }
+                slotCard.setOnClickListener(onEmptySlotClicked)
+                btnBuy.setOnClickListener(onEmptySlotClicked)
 
                 slotCard.addView(tvTitle)
                 slotCard.addView(tvDesc)
@@ -860,6 +863,7 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         hideAllCards()
         activeSelectedJetId = jetId
         binding.cardJetSortieControl.visibility = View.VISIBLE
+        binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng}, 16.5);", null)
 
         binding.tvJetControlTitle.text = "${u.name} (Lead Sortie)"
         val orderDesc = when (u.order) {
@@ -1014,6 +1018,11 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             structures.find { it.id == id }?.let { s ->
                 binding.tvInspectorHp.text = "${s.hp} / ${s.maxHp}"
                 binding.pbInspectorHp.progress = s.hp
+                if (s.type == "airbase") {
+                    renderHangarSlots(s)
+                } else if (s.type == "sam") {
+                    renderSamSlots(s)
+                }
             }
         }
     }
@@ -1022,9 +1031,11 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
         if (isMapReady) {
             syncUnitsToMap()
         }
-        // Live update fuel in jet control card if visible
+        // Smoothly follow moving aircraft in real time if selected
         activeSelectedJetId?.let { id ->
-            units.find { it.id == id }?.let { u ->
+            val u = units.find { it.id == id }
+            if (u != null) {
+                binding.mapWebView.evaluateJavascript("window.panToCoordinates(${u.position.lat}, ${u.position.lng});", null)
                 val fuel = u.fuelPercent.toInt()
                 binding.tvJetFuelPercent.text = "$fuel%"
                 binding.pbJetFuel.progress = fuel
@@ -1033,7 +1044,10 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                     "patrol" -> "AIR COMBAT PATROL (CAP)"
                     else -> "RETURNING TO AIRBASE (RTB)"
                 }
-                binding.tvJetControlStatus.text = orderDesc
+                binding.tvJetControlStatus.text = "🎥 TRACKING • $orderDesc"
+            } else {
+                activeSelectedJetId = null
+                binding.cardJetSortieControl.visibility = View.GONE
             }
         }
     }
@@ -1098,10 +1112,32 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                     maxHp = sObj.optInt("maxHp", 100),
                     radiusMeters = sObj.optDouble("radiusMeters", 150.0),
                     radiusType = sObj.optString("radiusType", "influence"),
-                    online = sObj.optBoolean("online", true)
+                    online = sObj.optBoolean("online", true),
+                    upgradeFinishedAt = if (sObj.has("upgradeFinishedAt") && !sObj.isNull("upgradeFinishedAt")) sObj.getLong("upgradeFinishedAt") else null,
+                    samMunitions = sObj.optInt("samMunitions", 6)
                 )
+                if (sObj.has("hangarJets")) {
+                    val jArr = sObj.getJSONArray("hangarJets")
+                    for (k in 0 until jArr.length()) {
+                        val jObj = jArr.getJSONObject(k)
+                        s.hangarJets.add(
+                            com.yuddhasphere.models.HangarJetItem(
+                                id = jObj.getString("id"),
+                                catalogId = jObj.getString("catalogId"),
+                                name = jObj.optString("name", "Fighter"),
+                                role = jObj.optString("role", "Air Superiority"),
+                                hp = jObj.optInt("hp", 100),
+                                maxHp = jObj.optInt("maxHp", 100),
+                                status = jObj.optString("status", "Ready in Hangar")
+                            )
+                        )
+                    }
+                }
                 val idx = gameState.structures.indexOfFirst { it.id == id }
                 if (idx != -1) {
+                    if (s.hangarJets.isEmpty() && gameState.structures[idx].hangarJets.isNotEmpty()) {
+                        s.hangarJets.addAll(gameState.structures[idx].hangarJets)
+                    }
                     gameState.structures[idx] = s
                 } else {
                     // Match against optimistic local placement at identical coords
@@ -1111,6 +1147,9 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
                         Math.abs(it.position.lng - s.position.lng) < 0.0001
                     }
                     if (localMatchIdx != -1) {
+                        if (s.hangarJets.isEmpty() && gameState.structures[localMatchIdx].hangarJets.isNotEmpty()) {
+                            s.hangarJets.addAll(gameState.structures[localMatchIdx].hangarJets)
+                        }
                         gameState.structures[localMatchIdx] = s
                     } else {
                         gameState.structures.add(s)
@@ -1130,9 +1169,29 @@ class MainActivity : AppCompatActivity(), MapBridge.BridgeListener, LocalGameSta
             }
         }
 
+        // 3. Authoritative player stat updates from server
+        if (diffJson.has("playerUpdate")) {
+            val pUpdate = diffJson.getJSONObject("playerUpdate")
+            if (pUpdate.has("wealth")) {
+                gameState.player.wealth = pUpdate.getInt("wealth")
+            }
+            if (pUpdate.has("incomePerHour")) {
+                gameState.player.incomePerHour = pUpdate.getInt("incomePerHour")
+            }
+            binding.tvWealth.text = String.format("%,d", gameState.player.wealth)
+            binding.tvIncomeRate.text = "+$${gameState.player.incomePerHour}/h"
+            gameState.saveLocalWorld()
+        }
+
         if (worldChanged) {
             gameState.saveLocalWorld()
             syncWorldToMap()
+            activeInspectedStructureId?.let { id ->
+                val inspected = gameState.structures.find { it.id == id }
+                if (inspected != null && binding.cardStructureInspector.visibility == View.VISIBLE) {
+                    showStructureInspector(inspected.id)
+                }
+            }
         }
     }
 

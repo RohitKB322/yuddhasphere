@@ -26,6 +26,7 @@ class MapBridge(private val listener: BridgeListener) {
         fun onUnitShotDown(unitId: String, unitName: String)
         fun onMapPointClicked(lat: Double, lng: Double, structureId: String, structureName: String, isEnemy: Boolean)
         fun onDetonationImpact(lat: Double, lng: Double, missileType: String)
+        fun onProjectileDestroyedInMidAir(missileId: String, lat: Double, lng: Double) {}
         fun onJetFlaresDeployed(unitId: String, flaresRemaining: Int, isDecoyed: Boolean)
     }
 
@@ -94,6 +95,11 @@ class MapBridge(private val listener: BridgeListener) {
     @JavascriptInterface
     fun onDetonationImpact(lat: Double, lng: Double, missileType: String) {
         mainHandler.post { listener.onDetonationImpact(lat, lng, missileType) }
+    }
+
+    @JavascriptInterface
+    fun onProjectileDestroyedInMidAir(missileId: String, lat: Double, lng: Double) {
+        mainHandler.post { listener.onProjectileDestroyedInMidAir(missileId, lat, lng) }
     }
 
     @JavascriptInterface

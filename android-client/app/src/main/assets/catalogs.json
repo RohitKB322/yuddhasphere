@@ -61,9 +61,6 @@
       "description": "Armored close air support jet with 2,200km range and 30mm GAU-8 rotary cannon."
     }
   ],
-      "description": "Armored close air support platform armed with heavy rotary cannon."
-    }
-  ],
   "interceptors": [
     {
       "id": "int_short",

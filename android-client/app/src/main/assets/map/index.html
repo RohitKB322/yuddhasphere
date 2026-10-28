@@ -682,8 +682,11 @@
             iconAnchor: [22, 22]
           });
 
+          const visualKey = `${strokeColor}_${callsignColor}_${ownerCallsign}_${u.name}_${isSelected ? '1' : '0'}`;
+
           if (!unitMarkers[u.id]) {
             const marker = L.marker([lat, lng], { icon: unitIcon, zIndexOffset: 950 }).addTo(map);
+            marker._cachedVisualKey = visualKey;
             marker._curLat = lat;
             marker._curLng = lng;
             marker._startLat = lat;
@@ -722,7 +725,10 @@
             unitMarkers[u.id] = marker;
           } else {
             const m = unitMarkers[u.id];
-            m.setIcon(unitIcon);
+            if (m._cachedVisualKey !== visualKey) {
+              m._cachedVisualKey = visualKey;
+              m.setIcon(unitIcon);
+            }
             // Smooth interpolation setup
             m._startLat = m._curLat || m.getLatLng().lat;
             m._startLng = m._curLng || m.getLatLng().lng;
@@ -791,14 +797,23 @@
         }
       }
 
-      // 60FPS Silky Smooth Camera Tracking when aircraft is selected
+      // 30FPS Throttled Smooth Camera Tracking with deadband when aircraft is selected
       if (isTrackingJet && selectedJetId && unitMarkers[selectedJetId] && map) {
         const tracked = unitMarkers[selectedJetId];
         if (tracked && tracked._curLat !== undefined) {
-          const curZoom = map.getZoom();
-          // Scale latitude offset relative to zoom so aircraft remains centered in upper 55% at ALL zoom levels
-          const latOffset = 0.0032 * Math.pow(2, 16 - curZoom);
-          map.setView([tracked._curLat - latOffset, tracked._curLng], curZoom, { animate: false });
+          if (!window._lastJetCamTime || (now - window._lastJetCamTime >= 33)) {
+            window._lastJetCamTime = now;
+            const curZoom = map.getZoom();
+            const latOffset = 0.0032 * Math.pow(2, 16 - curZoom);
+            const targetLat = tracked._curLat - latOffset;
+            const targetLng = tracked._curLng;
+            if (!window._lastJetCamPos ||
+                Math.abs(window._lastJetCamPos.lat - targetLat) > 0.00002 ||
+                Math.abs(window._lastJetCamPos.lng - targetLng) > 0.00002) {
+              window._lastJetCamPos = { lat: targetLat, lng: targetLng };
+              map.panTo([targetLat, targetLng], { animate: false });
+            }
+          }
         }
       }
 
@@ -963,6 +978,7 @@
       let targetLat = data.toLat;
       let targetLng = data.toLng;
       const targetUnitId = data.targetUnitId && data.targetUnitId.length > 0 ? data.targetUnitId : null;
+      const targetMissileId = data.targetMissileId && data.targetMissileId.length > 0 ? data.targetMissileId : null;
 
       // Classify the missile types (with robust alias support)
       const isSamInterceptor = missileType === 'sam_interceptor';
@@ -1116,6 +1132,7 @@
         type: missileType,
         targetName: targetName,
         targetUnitId: targetUnitId,
+        targetMissileId: targetMissileId,
         speedMach: speedMach,
         hitProbability: hitProbability,
         startLat: startLat,
@@ -1158,6 +1175,31 @@
       function step(now) {
         if (missileObj.finished) return;
 
+        // Dynamic In-Flight Interception of incoming missiles & bombs
+        if (missileObj.targetMissileId && activeMissiles[missileObj.targetMissileId]) {
+          const threatMsl = activeMissiles[missileObj.targetMissileId];
+          if (threatMsl && !threatMsl.finished) {
+            missileObj.targetLat = threatMsl.curLat;
+            missileObj.targetLng = threatMsl.curLng;
+            const distToThreat = computeDistanceMeters(missileObj.curLat, missileObj.curLng, threatMsl.curLat, threatMsl.curLng);
+            if (distToThreat <= 450 || t >= 0.90) {
+              // Destroy both in mid-air flak explosion!
+              missileObj.finished = true;
+              threatMsl.finished = true;
+              delete activeMissiles[id];
+              delete activeMissiles[threatMsl.id];
+
+              map.removeLayer(missileMarker);
+              map.removeLayer(trailLine);
+              if (threatMsl.marker) map.removeLayer(threatMsl.marker);
+              if (threatMsl.trail) map.removeLayer(threatMsl.trail);
+
+              triggerMidAirBurst(threatMsl.curLat, threatMsl.curLng);
+              return;
+            }
+          }
+        }
+
         // Dynamic Homing for anti-ship, sam, or air-to-air targeting aircraft
         if (missileObj.targetUnitId && unitsCache) {
           const liveTarget = unitsCache.find(u => u.id === missileObj.targetUnitId);
@@ -1196,6 +1238,19 @@
                   window.AndroidBridge.onJetFlaresDeployed(liveTarget.id, liveTarget.flaresRemaining, missileObj.decoyed || false);
                 }
               }
+            }
+
+            // Target hit check: Splash one!
+            if (distToJet <= 350 && !missileObj.decoyed) {
+              missileObj.finished = true;
+              delete activeMissiles[id];
+              map.removeLayer(missileMarker);
+              map.removeLayer(trailLine);
+              triggerMidAirBurst(liveTarget.position.lat, liveTarget.position.lng);
+              if (window.AndroidBridge && window.AndroidBridge.onUnitShotDown) {
+                window.AndroidBridge.onUnitShotDown(liveTarget.id, liveTarget.name);
+              }
+              return;
             }
           }
         }
@@ -1289,11 +1344,21 @@
         if (trailPoints.length > 70) trailPoints.shift();
         trailLine.setLatLngs(trailPoints);
 
-        // 60FPS Camera Follow Interceptor
+        // 30FPS Throttled Camera Follow Interceptor
         if (isTrackingMissile && trackedMissileId === id && map) {
-          const curZoom = map.getZoom();
-          const latOffset = 0.0024 * Math.pow(2, 16 - curZoom);
-          map.setView([missileObj.curLat - latOffset, missileObj.curLng], curZoom, { animate: false });
+          if (!window._lastMslCamTime || (now - window._lastMslCamTime >= 33)) {
+            window._lastMslCamTime = now;
+            const curZoom = map.getZoom();
+            const latOffset = 0.0024 * Math.pow(2, 16 - curZoom);
+            const targetLat = missileObj.curLat - latOffset;
+            const targetLng = missileObj.curLng;
+            if (!window._lastMslCamPos ||
+                Math.abs(window._lastMslCamPos.lat - targetLat) > 0.00002 ||
+                Math.abs(window._lastMslCamPos.lng - targetLng) > 0.00002) {
+              window._lastMslCamPos = { lat: targetLat, lng: targetLng };
+              map.panTo([targetLat, targetLng], { animate: false });
+            }
+          }
         }
 
         const distRemainingM = computeDistanceMeters(missileObj.curLat, missileObj.curLng, missileObj.targetLat, missileObj.targetLng);
@@ -1307,8 +1372,11 @@
           map.removeLayer(trailLine);
 
           // Impact shockwave or mid-air intercept burst
-          if (isSamInterceptor) {
+          if (isSamInterceptor || missileType === 'air_to_air') {
             triggerMidAirBurst(missileObj.targetLat, missileObj.targetLng);
+            if (missileObj.targetUnitId && window.AndroidBridge && window.AndroidBridge.onUnitShotDown) {
+              window.AndroidBridge.onUnitShotDown(missileObj.targetUnitId, missileObj.targetName);
+            }
           } else {
             triggerDetonationShockwave(missileObj.targetLat, missileObj.targetLng, missileObj);
           }
@@ -1569,6 +1637,40 @@
         }
       }
     }
+
+    window.destroyMissileInMidAir = function(missileId, lat, lng) {
+      if (!map) return;
+      const m = activeMissiles[missileId];
+      const burstLat = lat != null ? lat : (m ? m.curLat : null);
+      const burstLng = lng != null ? lng : (m ? m.curLng : null);
+      if (m) {
+        m.finished = true;
+        if (m.marker) map.removeLayer(m.marker);
+        if (m.trail) map.removeLayer(m.trail);
+        delete activeMissiles[missileId];
+      }
+      if (burstLat != null && burstLng != null) {
+        triggerMidAirBurst(burstLat, burstLng);
+      }
+    };
+
+    window.destroyUnitVisual = function(unitId, lat, lng) {
+      if (!map) return;
+      const m = unitMarkers[unitId];
+      const burstLat = lat != null ? lat : (m ? m.getLatLng().lat : null);
+      const burstLng = lng != null ? lng : (m ? m.getLatLng().lng : null);
+      if (m) {
+        map.removeLayer(m);
+        delete unitMarkers[unitId];
+      }
+      if (unitFlightPaths[unitId]) {
+        map.removeLayer(unitFlightPaths[unitId]);
+        delete unitFlightPaths[unitId];
+      }
+      if (burstLat != null && burstLng != null) {
+        triggerMidAirBurst(burstLat, burstLng);
+      }
+    };
 
     // Backwards-compatible alias for simple calls
     window.animateMissileLaunch = function(startLat, startLng, endLat, endLng, missileType) {

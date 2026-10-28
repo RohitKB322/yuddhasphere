@@ -21,6 +21,7 @@ class LocalGameState(private val context: Context) {
         fun onUnitsUpdated(units: List<UnitItem>)
         fun onAlert(title: String, message: String)
         fun onStructureUpgradeCompleted(structure: Structure)
+        fun onProjectileDestroyedInMidAir(missileId: String, lat: Double, lng: Double) {}
         fun onMissileFired(
             missileId: String,
             fromLat: Double,
@@ -29,6 +30,7 @@ class LocalGameState(private val context: Context) {
             toLng: Double,
             missileType: String,
             targetUnitId: String? = null,
+            targetMissileId: String? = null,
             targetName: String = "Target Vector",
             speedMach: Double = 4.2,
             hitProbability: Double = 0.88,
@@ -54,6 +56,7 @@ class LocalGameState(private val context: Context) {
 
     private val listeners: MutableList<StateListener> = mutableListOf()
     private val handler = Handler(Looper.getMainLooper())
+    private val ioExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
     private var incomeAccumulator: Double = 0.0
     private var hasInitialGpsFixed: Boolean = false
     private var tickCounter: Int = 0
@@ -130,128 +133,166 @@ class LocalGameState(private val context: Context) {
             }
             root.put("activeMissiles", mslArr)
 
-            val file = File(context.filesDir, "world_cache.json")
-            file.writeText(root.toString())
+            val jsonString = root.toString()
+            ioExecutor.execute {
+                try {
+                    val file = File(context.filesDir, "world_cache.json")
+                    val tmpFile = File(context.filesDir, "world_cache.json.tmp")
+                    tmpFile.writeText(jsonString)
+                    if (tmpFile.exists()) {
+                        if (file.exists()) file.delete()
+                        tmpFile.renameTo(file)
+                    }
+                } catch (ioe: Exception) {
+                    ioe.printStackTrace()
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
     fun loadLocalWorld(): Boolean {
+        var anyDataLoaded = false
         try {
-            val file = File(context.filesDir, "world_cache.json")
-            if (!file.exists()) return false
-
-            val root = JSONObject(file.readText())
-            if (root.has("player")) {
-                val pObj = root.getJSONObject("player")
-                player.id = pObj.optString("id", player.id)
-                player.callsign = pObj.optString("callsign", player.callsign)
-                player.team = pObj.optString("team", player.team)
-                player.teamColor = pObj.optString("teamColor", player.teamColor)
-                player.allianceTag = pObj.optString("allianceTag", player.allianceTag)
-                player.wealth = pObj.optInt("wealth", player.wealth)
-                player.incomePerHour = pObj.optInt("incomePerHour", player.incomePerHour)
-                player.hp = pObj.optInt("hp", player.hp)
-                player.maxHp = pObj.optInt("maxHp", player.maxHp)
-                if (pObj.has("position")) {
-                    val posObj = pObj.getJSONObject("position")
-                    player.position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng"))
-                }
-                if (pObj.has("holdings")) {
-                    player.holdings.clear()
-                    val hArr = pObj.getJSONArray("holdings")
-                    for (i in 0 until hArr.length()) {
-                        val hObj = hArr.getJSONObject(i)
-                        val h = PortfolioHolding(
-                            assetId = hObj.getString("assetId"),
-                            quantity = hObj.getInt("quantity"),
-                            totalInvested = hObj.optDouble("totalInvested", 0.0)
-                        )
-                        player.holdings[h.assetId] = h
-                    }
-                }
+            var file = File(context.filesDir, "world_cache.json")
+            if (!file.exists()) {
+                val tmp = File(context.filesDir, "world_cache.json.tmp")
+                if (tmp.exists()) file = tmp else return false
             }
 
-            if (root.has("marketAssets")) {
-                val mArr = root.getJSONArray("marketAssets")
-                for (i in 0 until mArr.length()) {
-                    val mObj = mArr.getJSONObject(i)
-                    val id = mObj.getString("id")
-                    val asset = marketAssets[id]
-                    if (asset != null) {
-                        asset.currentPrice = mObj.optDouble("currentPrice", asset.basePrice)
-                        asset.changePercent = mObj.optDouble("changePercent", 0.0)
-                        if (mObj.has("priceHistory")) {
-                            asset.priceHistory.clear()
-                            val histArr = mObj.getJSONArray("priceHistory")
-                            for (h in 0 until histArr.length()) {
-                                asset.priceHistory.add(histArr.getDouble(h))
+            val text = file.readText()
+            if (text.isBlank()) return false
+            val root = JSONObject(text)
+
+            // 1. Player
+            try {
+                if (root.has("player")) {
+                    val pObj = root.getJSONObject("player")
+                    player.id = pObj.optString("id", player.id)
+                    player.callsign = pObj.optString("callsign", player.callsign)
+                    player.team = pObj.optString("team", player.team)
+                    player.teamColor = pObj.optString("teamColor", player.teamColor)
+                    player.allianceTag = pObj.optString("allianceTag", player.allianceTag)
+                    player.wealth = pObj.optInt("wealth", player.wealth)
+                    player.incomePerHour = pObj.optInt("incomePerHour", player.incomePerHour)
+                    player.hp = pObj.optInt("hp", player.hp)
+                    player.maxHp = pObj.optInt("maxHp", player.maxHp)
+                    if (pObj.has("position")) {
+                        val posObj = pObj.getJSONObject("position")
+                        player.position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng"))
+                    }
+                    if (pObj.has("holdings")) {
+                        player.holdings.clear()
+                        val hArr = pObj.getJSONArray("holdings")
+                        for (i in 0 until hArr.length()) {
+                            val hObj = hArr.getJSONObject(i)
+                            val h = PortfolioHolding(
+                                assetId = hObj.getString("assetId"),
+                                quantity = hObj.getInt("quantity"),
+                                totalInvested = hObj.optDouble("totalInvested", 0.0)
+                            )
+                            player.holdings[h.assetId] = h
+                        }
+                    }
+                    anyDataLoaded = true
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // 2. Market Assets
+            try {
+                if (root.has("marketAssets")) {
+                    val mArr = root.getJSONArray("marketAssets")
+                    for (i in 0 until mArr.length()) {
+                        val mObj = mArr.getJSONObject(i)
+                        val id = mObj.getString("id")
+                        val asset = marketAssets[id]
+                        if (asset != null) {
+                            asset.currentPrice = mObj.optDouble("currentPrice", asset.basePrice)
+                            asset.changePercent = mObj.optDouble("changePercent", 0.0)
+                            if (mObj.has("priceHistory")) {
+                                asset.priceHistory.clear()
+                                val histArr = mObj.getJSONArray("priceHistory")
+                                for (h in 0 until histArr.length()) {
+                                    asset.priceHistory.add(histArr.getDouble(h))
+                                }
                             }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
 
-            if (root.has("structures")) {
-                structures.clear()
-                val sArr = root.getJSONArray("structures")
-                for (i in 0 until sArr.length()) {
-                    val sObj = sArr.getJSONObject(i)
-                    val posObj = sObj.getJSONObject("position")
-                    val s = Structure(
-                        id = sObj.getString("id"),
-                        ownerId = sObj.optString("ownerId", player.id),
-                        team = sObj.optString("team", player.team),
-                        teamColor = sObj.optString("teamColor", player.teamColor),
-                        type = sObj.getString("type"),
-                        name = sObj.optString("name", "Structure"),
-                        level = sObj.optInt("level", 1),
-                        position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng")),
-                        hp = sObj.optInt("hp", 100),
-                        maxHp = sObj.optInt("maxHp", 100),
-                        radiusMeters = if (sObj.getString("type") == "sam") 100000.0 else if (sObj.getString("type") == "missile_silo") 200000.0 else sObj.optDouble("radiusMeters", 150.0),
-                        radiusType = sObj.optString("radiusType", "influence"),
-                        online = sObj.optBoolean("online", true),
-                        upgradeFinishedAt = if (sObj.has("upgradeFinishedAt") && !sObj.isNull("upgradeFinishedAt")) sObj.getLong("upgradeFinishedAt") else null,
-                        samMunitions = sObj.optInt("samMunitions", 6),
-                        missileMunitions = sObj.optInt("missileMunitions", 4)
-                    )
-                    if (sObj.has("equippedMissiles")) {
-                        val mArr = sObj.getJSONArray("equippedMissiles")
-                        for (m in 0 until mArr.length()) {
-                            s.equippedMissiles.add(mArr.getString(m))
+            // 3. Structures
+            try {
+                if (root.has("structures")) {
+                    structures.clear()
+                    val sArr = root.getJSONArray("structures")
+                    for (i in 0 until sArr.length()) {
+                        val sObj = sArr.getJSONObject(i)
+                        val posObj = sObj.getJSONObject("position")
+                        val s = Structure(
+                            id = sObj.getString("id"),
+                            ownerId = sObj.optString("ownerId", player.id),
+                            team = sObj.optString("team", player.team),
+                            teamColor = sObj.optString("teamColor", player.teamColor),
+                            type = sObj.getString("type"),
+                            name = sObj.optString("name", "Structure"),
+                            level = sObj.optInt("level", 1),
+                            position = GeoPoint(posObj.getDouble("lat"), posObj.getDouble("lng")),
+                            hp = sObj.optInt("hp", 100),
+                            maxHp = sObj.optInt("maxHp", 100),
+                            radiusMeters = if (sObj.getString("type") == "sam") 100000.0 else if (sObj.getString("type") == "missile_silo") 200000.0 else sObj.optDouble("radiusMeters", 150.0),
+                            radiusType = sObj.optString("radiusType", "influence"),
+                            online = sObj.optBoolean("online", true),
+                            upgradeFinishedAt = if (sObj.has("upgradeFinishedAt") && !sObj.isNull("upgradeFinishedAt")) sObj.getLong("upgradeFinishedAt") else null,
+                            samMunitions = sObj.optInt("samMunitions", 6),
+                            missileMunitions = sObj.optInt("missileMunitions", 4)
+                        )
+                        if (sObj.has("equippedMissiles")) {
+                            val mArr = sObj.getJSONArray("equippedMissiles")
+                            for (m in 0 until mArr.length()) {
+                                s.equippedMissiles.add(mArr.getString(m))
+                            }
                         }
-                    }
-                    if (s.type == "missile_silo" && s.equippedMissiles.isEmpty() && s.missileMunitions > 0) {
-                        val defaultTypes = listOf("missile_ballistic", "missile_cruise", "missile_hypersonic", "missile_cluster", "missile_antiship")
-                        for (i in 0 until s.missileMunitions.coerceAtMost(s.maxMissileSlots())) {
-                            s.equippedMissiles.add(defaultTypes[i % defaultTypes.size])
+                        if (s.type == "missile_silo" && s.equippedMissiles.isEmpty() && s.missileMunitions > 0) {
+                            val defaultTypes = listOf("missile_ballistic", "missile_cruise", "missile_hypersonic", "missile_cluster", "missile_antiship")
+                            for (mIdx in 0 until s.missileMunitions.coerceAtMost(s.maxMissileSlots())) {
+                                s.equippedMissiles.add(defaultTypes[mIdx % defaultTypes.size])
+                            }
                         }
-                    }
 
-                    if (sObj.has("hangarJets")) {
-                        val jArr = sObj.getJSONArray("hangarJets")
-                        for (j in 0 until jArr.length()) {
-                            val jObj = jArr.getJSONObject(j)
-                            s.hangarJets.add(
-                                HangarJetItem(
-                                    id = jObj.getString("id"),
-                                    catalogId = jObj.getString("catalogId"),
-                                    name = jObj.optString("name", "Fighter"),
-                                    role = jObj.optString("role", "Air Superiority"),
-                                    hp = jObj.optInt("hp", 100),
-                                    maxHp = jObj.optInt("maxHp", 100),
-                                    status = jObj.optString("status", "Ready in Hangar"),
-                                    flaresRemaining = jObj.optInt("flaresRemaining", 3)
+                        if (sObj.has("hangarJets")) {
+                            val jArr = sObj.getJSONArray("hangarJets")
+                            for (j in 0 until jArr.length()) {
+                                val jObj = jArr.getJSONObject(j)
+                                s.hangarJets.add(
+                                    HangarJetItem(
+                                        id = jObj.getString("id"),
+                                        catalogId = jObj.getString("catalogId"),
+                                        name = jObj.optString("name", "Fighter"),
+                                        role = jObj.optString("role", "Air Superiority"),
+                                        hp = jObj.optInt("hp", 100),
+                                        maxHp = jObj.optInt("maxHp", 100),
+                                        status = jObj.optString("status", "Ready in Hangar"),
+                                        flaresRemaining = jObj.optInt("flaresRemaining", 3)
+                                    )
                                 )
-                            )
+                            }
                         }
+                        structures.add(s)
                     }
-                    structures.add(s)
+                    if (structures.isNotEmpty()) anyDataLoaded = true
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
 
-                // Restore in-flight active units & dogfight positions
+            // 4. In-Flight Active Units
+            try {
                 if (root.has("activeUnits")) {
                     activeUnits.clear()
                     val uArr = root.getJSONArray("activeUnits")
@@ -303,7 +344,12 @@ class LocalGameState(private val context: Context) {
                         }
                     }
                 }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
 
+            // 5. In-Flight Active Missiles
+            try {
                 if (root.has("activeMissiles")) {
                     activeMissiles.clear()
                     val mArr = root.getJSONArray("activeMissiles")
@@ -329,6 +375,7 @@ class LocalGameState(private val context: Context) {
                             currentPos = GeoPoint(curPosObj.getDouble("lat"), curPosObj.getDouble("lng")),
                             targetPos = GeoPoint(targetPosObj.getDouble("lat"), targetPosObj.getDouble("lng")),
                             targetUnitId = if (mObj.has("targetUnitId") && !mObj.isNull("targetUnitId")) mObj.getString("targetUnitId") else null,
+                            targetMissileId = if (mObj.has("targetMissileId") && !mObj.isNull("targetMissileId")) mObj.getString("targetMissileId") else null,
                             targetStructureId = if (mObj.has("targetStructureId") && !mObj.isNull("targetStructureId")) mObj.getString("targetStructureId") else null,
                             targetName = mObj.optString("targetName", "Tactical Target"),
                             totalDistanceMeters = mObj.optDouble("totalDistanceMeters", 100000.0),
@@ -344,19 +391,21 @@ class LocalGameState(private val context: Context) {
 
                         if (!m.finished) {
                             activeMissiles.add(m)
-                        } else if (!m.intercepted) {
+                        } else if (!m.intercepted && m.type != "sam_interceptor" && m.type != "air_to_air") {
                             applyExplosionDamage(m.targetPos, m.type)
                         }
                     }
                 }
-
-                recalculateIncome()
-                return true
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
+
+            recalculateIncome()
+            return anyDataLoaded
         } catch (e: Exception) {
             e.printStackTrace()
+            return false
         }
-        return false
     }
 
     fun applyServerSync(srvPlayer: Player, srvStructures: List<Structure>) {
@@ -703,7 +752,32 @@ class LocalGameState(private val context: Context) {
                             if (now - lastFired > 12000L) {
                                 samCooldownMap[sam.id] = now
                                 sam.samMunitions -= 1
+                                val samDist = GeoMath.calculateDistanceMeters(sam.position, u.position)
+                                val samMach = 4.8
+                                val samFlightSec = (samDist / (samMach * 340.0 * 4.0)).coerceAtLeast(3.0)
                                 val samMslId = "sam_" + UUID.randomUUID().toString().take(6)
+                                val samInterceptor = com.yuddhasphere.models.InFlightMissile(
+                                    id = samMslId,
+                                    type = "sam_interceptor",
+                                    ownerId = sam.ownerId,
+                                    team = sam.team,
+                                    startPos = sam.position,
+                                    currentPos = sam.position,
+                                    targetPos = u.position,
+                                    targetUnitId = u.id,
+                                    targetMissileId = null,
+                                    targetStructureId = null,
+                                    targetName = "${u.ownerCallsign} • ${u.name}",
+                                    totalDistanceMeters = samDist,
+                                    speedMach = samMach,
+                                    speedMps = samMach * 340.0,
+                                    totalFlightTimeSeconds = samFlightSec,
+                                    launchedAt = now,
+                                    progress = 0.0,
+                                    finished = false,
+                                    intercepted = false
+                                )
+                                activeMissiles.add(samInterceptor)
                                 listeners.forEach {
                                     it.onMissileFired(
                                         missileId = samMslId,
@@ -713,9 +787,12 @@ class LocalGameState(private val context: Context) {
                                         toLng = u.position.lng,
                                         missileType = "sam_interceptor",
                                         targetUnitId = u.id,
+                                        targetMissileId = null,
                                         targetName = "${u.ownerCallsign} • ${u.name}",
                                         speedMach = 4.8,
-                                        hitProbability = 1.0
+                                        hitProbability = 1.0,
+                                        flightDurationSeconds = samFlightSec,
+                                        progress = 0.0
                                     )
                                     it.onAlert("SAM AIR DEFENSE!", "PATRIOT Battery locked and fired PAC-3 interceptor at ${u.name} (Range: ${(distToSam / 1000).toInt()} km)!")
                                 }
@@ -741,6 +818,11 @@ class LocalGameState(private val context: Context) {
             val mNow = System.currentTimeMillis()
             while (mIterator.hasNext()) {
                 val m = mIterator.next()
+                if (m.finished) {
+                    mIterator.remove()
+                    continue
+                }
+
                 val elapsedSec = (mNow - m.launchedAt) / 1000.0
                 m.progress = (elapsedSec / m.totalFlightTimeSeconds).coerceIn(0.0, 1.0)
                 val dLat = m.targetPos.lat - m.startPos.lat
@@ -750,10 +832,96 @@ class LocalGameState(private val context: Context) {
                     m.startPos.lng + dLng * m.progress
                 )
 
+                // Sub-case A: Interceptor targeting an aircraft (u)
+                if (m.targetUnitId != null && (m.type == "sam_interceptor" || m.type == "air_to_air")) {
+                    val targetUnit = activeUnits.find { it.id == m.targetUnitId }
+                    if (targetUnit != null) {
+                        m.targetPos = targetUnit.position
+                        val distToTarget = GeoMath.calculateDistanceMeters(m.currentPos, targetUnit.position)
+                        if (distToTarget <= 800.0 || m.progress >= 0.95) {
+                            m.finished = true
+                            mIterator.remove()
+
+                            // Check flares
+                            var isHit = true
+                            if (targetUnit.flaresRemaining > 0) {
+                                targetUnit.flaresRemaining -= 1
+                                val decoyRoll = Math.random()
+                                if (decoyRoll < 0.80) {
+                                    isHit = false
+                                    listeners.forEach {
+                                        it.onAlert("FLARES DEPLOYED!", "${targetUnit.name} popped countermeasures and decoyed the interceptor! (${targetUnit.flaresRemaining} flares left)")
+                                    }
+                                }
+                            }
+
+                            if (isHit) {
+                                destroyUnitInCombat(targetUnit.id, targetUnit.name)
+                                listeners.forEach {
+                                    it.onProjectileDestroyedInMidAir(m.id, targetUnit.position.lat, targetUnit.position.lng)
+                                }
+                            } else {
+                                listeners.forEach {
+                                    it.onProjectileDestroyedInMidAir(m.id, m.currentPos.lat, m.currentPos.lng)
+                                }
+                            }
+                            stateChanged = true
+                            continue
+                        }
+                    } else {
+                        // Target aircraft no longer exists
+                        if (m.progress >= 0.95) {
+                            m.finished = true
+                            mIterator.remove()
+                            continue
+                        }
+                    }
+                }
+
+                // Sub-case B: Interceptor targeting an incoming missile or bomb
+                if (m.targetMissileId != null && m.type == "sam_interceptor") {
+                    val threat = activeMissiles.find { it.id == m.targetMissileId && !it.finished }
+                    if (threat != null) {
+                        m.targetPos = threat.currentPos
+                        val distToThreat = GeoMath.calculateDistanceMeters(m.currentPos, threat.currentPos)
+                        if (distToThreat <= 1500.0 || m.progress >= 0.85) {
+                            // Mid-air collision and destruction!
+                            m.finished = true
+                            threat.finished = true
+                            threat.intercepted = true
+                            threat.interceptedBySamId = m.ownerId
+                            mIterator.remove()
+
+                            listeners.forEach {
+                                it.onProjectileDestroyedInMidAir(threat.id, threat.currentPos.lat, threat.currentPos.lng)
+                                it.onProjectileDestroyedInMidAir(m.id, m.currentPos.lat, m.currentPos.lng)
+                                it.onAlert("MID-AIR INTERCEPT SUCCESS!", "PAC-3 ABM detonated and destroyed incoming ${threat.type.uppercase()} before impact!")
+                            }
+                            addCombatReport(
+                                category = "combat",
+                                urgencyTag = "THREAT DESTROYED",
+                                title = "Incoming Munition Destroyed in Flight",
+                                detail = "Air defense interceptor intercepted and neutralized incoming ${threat.type.uppercase()} in mid-air.",
+                                level = "info"
+                            )
+                            stateChanged = true
+                            continue
+                        }
+                    } else {
+                        // Threat was already destroyed or finished
+                        if (m.progress >= 0.90) {
+                            m.finished = true
+                            mIterator.remove()
+                            continue
+                        }
+                    }
+                }
+
+                // Sub-case C: Standard missile/bomb reaching destination
                 if (m.progress >= 1.0) {
                     m.finished = true
                     mIterator.remove()
-                    if (!m.intercepted) {
+                    if (!m.intercepted && m.type != "sam_interceptor" && m.type != "air_to_air") {
                         applyExplosionDamage(m.targetPos, m.type)
                         addCombatReport(
                             "combat",
@@ -761,7 +929,7 @@ class LocalGameState(private val context: Context) {
                             "${getMissileInfo(m.type).name} reached designated target coordinates and detonated!",
                             "danger"
                         )
-                    } else {
+                    } else if (m.intercepted) {
                         addCombatReport(
                             "combat",
                             "INTERCEPTION SUCCESS",
@@ -812,6 +980,7 @@ class LocalGameState(private val context: Context) {
                             currentPos = sam.position,
                             targetPos = interceptPos,
                             targetUnitId = null,
+                            targetMissileId = m.id,
                             targetStructureId = null,
                             targetName = "INTERCEPT: ${m.type.uppercase()}",
                             totalDistanceMeters = samDist,
@@ -835,6 +1004,7 @@ class LocalGameState(private val context: Context) {
                                 toLng = interceptPos.lng,
                                 missileType = "sam_interceptor",
                                 targetUnitId = null,
+                                targetMissileId = m.id,
                                 targetName = "PAC-3 MSE ABM Interceptor",
                                 speedMach = samMach,
                                 hitProbability = 1.0,
@@ -859,8 +1029,7 @@ class LocalGameState(private val context: Context) {
                 }
             }
         }
-
-        // 6. Hostile Bogey Autonomous Attack Runs (Munition releases toward player)
+                // 6. Hostile Bogey Autonomous Attack Runs (Munition releases toward player)
         for (u in activeUnits) {
             if (u.team == "red") {
                 val targetStruct = structures.filter { it.ownerId == player.id }.minByOrNull {
@@ -1263,7 +1432,31 @@ class LocalGameState(private val context: Context) {
 
         sam.samMunitions -= 1
         samCooldownMap[sam.id] = System.currentTimeMillis()
+        val samMach = 4.8
+        val samFlightSec = (distToSam / (samMach * 340.0 * 4.0)).coerceAtLeast(3.0)
         val samMslId = "sam_" + UUID.randomUUID().toString().take(6)
+        val samInterceptor = com.yuddhasphere.models.InFlightMissile(
+            id = samMslId,
+            type = "sam_interceptor",
+            ownerId = sam.ownerId,
+            team = sam.team,
+            startPos = sam.position,
+            currentPos = sam.position,
+            targetPos = target.position,
+            targetUnitId = target.id,
+            targetMissileId = null,
+            targetStructureId = null,
+            targetName = "${target.ownerCallsign} • ${target.name}",
+            totalDistanceMeters = distToSam,
+            speedMach = samMach,
+            speedMps = samMach * 340.0,
+            totalFlightTimeSeconds = samFlightSec,
+            launchedAt = System.currentTimeMillis(),
+            progress = 0.0,
+            finished = false,
+            intercepted = false
+        )
+        activeMissiles.add(samInterceptor)
         listeners.forEach {
             it.onPlayerUpdated(player)
             it.onStructuresUpdated(structures)
@@ -1275,9 +1468,12 @@ class LocalGameState(private val context: Context) {
                 toLng = target.position.lng,
                 missileType = "sam_interceptor",
                 targetUnitId = target.id,
+                targetMissileId = null,
                 targetName = "${target.ownerCallsign} • ${target.name}",
                 speedMach = 4.8,
-                hitProbability = 1.0
+                hitProbability = 1.0,
+                flightDurationSeconds = samFlightSec,
+                progress = 0.0
             )
             it.onAlert("MANUAL SAM LAUNCH!", "Launched PATRIOT PAC-3 interceptor at ${target.name} (Range: ${(distToSam / 1000).toInt()} km)!")
         }
@@ -1294,7 +1490,31 @@ class LocalGameState(private val context: Context) {
             return Pair(false, "Target beyond maximum 100km engagement envelope (${(distMeters / 1000).toInt()} km).")
         }
 
-        val missileId = "msl_" + UUID.randomUUID().toString().take(6)
+        val mach = 4.8
+        val flightSec = (distMeters / (mach * 340.0 * 4.0)).coerceAtLeast(2.5)
+        val missileId = "fox2_" + UUID.randomUUID().toString().take(6)
+        val fox2Interceptor = com.yuddhasphere.models.InFlightMissile(
+            id = missileId,
+            type = "air_to_air",
+            ownerId = firer.ownerId,
+            team = firer.team,
+            startPos = firer.position,
+            currentPos = firer.position,
+            targetPos = target.position,
+            targetUnitId = target.id,
+            targetMissileId = null,
+            targetStructureId = null,
+            targetName = "${target.ownerCallsign} • ${target.name}",
+            totalDistanceMeters = distMeters,
+            speedMach = mach,
+            speedMps = mach * 340.0,
+            totalFlightTimeSeconds = flightSec,
+            launchedAt = System.currentTimeMillis(),
+            progress = 0.0,
+            finished = false,
+            intercepted = false
+        )
+        activeMissiles.add(fox2Interceptor)
         listeners.forEach {
             it.onMissileFired(
                 missileId = missileId,
@@ -1304,9 +1524,12 @@ class LocalGameState(private val context: Context) {
                 toLng = target.position.lng,
                 missileType = "air_to_air",
                 targetUnitId = target.id,
+                targetMissileId = null,
                 targetName = "${target.ownerCallsign} • ${target.name}",
                 speedMach = 4.8,
-                hitProbability = 1.0
+                hitProbability = 1.0,
+                flightDurationSeconds = flightSec,
+                progress = 0.0
             )
             it.onAlert("FOX TWO!", "${firer.name} launched AIM-120D at ${target.name} (${(distMeters / 1000).toInt()} km)!")
         }

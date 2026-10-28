@@ -388,8 +388,9 @@ data class InFlightMissile(
     val team: String,
     val startPos: GeoPoint,
     var currentPos: GeoPoint,
-    val targetPos: GeoPoint,
+    var targetPos: GeoPoint,
     val targetUnitId: String? = null,
+    val targetMissileId: String? = null,
     val targetStructureId: String? = null,
     val targetName: String = "",
     val totalDistanceMeters: Double,
@@ -412,6 +413,7 @@ data class InFlightMissile(
             put("currentPos", currentPos.toJsonObject())
             put("targetPos", targetPos.toJsonObject())
             if (targetUnitId != null) put("targetUnitId", targetUnitId)
+            if (targetMissileId != null) put("targetMissileId", targetMissileId)
             if (targetStructureId != null) put("targetStructureId", targetStructureId)
             put("targetName", targetName)
             put("totalDistanceMeters", totalDistanceMeters)

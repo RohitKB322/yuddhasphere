@@ -357,6 +357,9 @@ class MarketSheet(
     override fun onUnitsUpdated(units: List<com.yuddhasphere.models.UnitItem>) {}
     override fun onAlert(title: String, message: String) {}
     override fun onStructureUpgradeCompleted(structure: com.yuddhasphere.models.Structure) {}
+
+    override fun onProjectileDestroyedInMidAir(missileId: String, lat: Double, lng: Double) {}
+
     override fun onMissileFired(
         missileId: String,
         fromLat: Double,
@@ -365,6 +368,7 @@ class MarketSheet(
         toLng: Double,
         missileType: String,
         targetUnitId: String?,
+        targetMissileId: String?,
         targetName: String,
         speedMach: Double,
         hitProbability: Double,
